@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Controlled Charge — Test Client</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; background: #111; color: #eee; }
+  input, button { font-size: 16px; padding: 8px; margin: 4px 0; }
+  #bombBar { height: 24px; background: #333; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  #bombFill { height: 100%; background: #e74c3c; width: 100%; transition: width 0.2s linear; }
+  #sessionBar { height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  #sessionFill { height: 100%; background: #2ecc71; width: 0%; transition: width 0.2s linear; }
+  .players { display: flex; gap: 8px; flex-wrap: wrap; }
+  .player { padding: 6px 10px; border-radius: 6px; background: #222; }
+  .player.unfocused { background: #7a1f1f; }
+  #minigame { display: none; background: #333; padding: 16px; border-radius: 8px; text-align: center; }
+  #log { font-size: 12px; color: #888; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <h1>Controlled Charge — Test Client</h1>
+
+  <div id="lobby">
+    <div>
+      <input id="teamName" placeholder="Team name (only used to create)" />
+      <button id="createBtn">Create Room</button>
+    </div>
+    <div>
+      <input id="roomCode" placeholder="Room code" style="text-transform:uppercase" />
+      <input id="playerName" placeholder="Your name" />
+      <button id="joinBtn">Join Room</button>
+    </div>
+  </div>
+
+  <div id="game" class="hidden">
+    <h2>Room: <span id="roomCodeLabel"></span> — <span id="stateLabel"></span></h2>
+    <button id="startBtn">Start Session</button>
+
+    <h3>Bomb danger buffer</h3>
+    <div id="bombBar"><div id="bombFill"></div></div>
+
+    <h3>Session progress</h3>
+    <div id="sessionBar"><div id="sessionFill"></div></div>
+
+    <h3>Players</h3>
+    <div class="players" id="players"></div>
+
+    <h3>Your focus</h3>
+    <button id="focusToggle">I'm FOCUSED (click to look away)</button>
+
+    <div id="minigame">
+      <h3>Study Break Mini-Game: <span id="minigameType"></span></h3>
+      <button id="minigameCompleteBtn">Complete it!</button>
+    </div>
+
+    <h3>Leaderboard</h3>
+    <ol id="leaderboard"></ol>
+  </div>
+
+  <h3>Log</h3>
+  <div id="log"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

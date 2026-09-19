@@ -1,0 +1,23 @@
+{
+  "name": "controlled-charge-server",
+  "version": "0.1.0",
+  "description": "Server for Controlled Charge - a focus-powered group bomb-defusal game",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "simulate": "node test/simulate.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "nanoid": "^3.3.7",
+    "socket.io": "^4.8.0"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.0"
+  }
+}
