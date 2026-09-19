@@ -7,3 +7,6 @@ leaderboard.db-shm
 server_out.log
 server_err.log
 server_pid.txt
+lt_out.log
+lt_err.log
+lt_pid.txt

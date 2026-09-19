@@ -53,8 +53,16 @@ $env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
 
 ## demoing it live
 
-- easiest: run the server on one laptop, everyone connects to `http://<that laptop's LAN IP>:3000` over the venue wifi
-- if judges need to hit it from outside the wifi: `npx localtunnel --port 3000` or `ngrok http 3000`
+- easiest: run the server on one laptop, everyone connects to `http://<that laptop's LAN IP>:3000` over the venue wifi (find your IP with `ipconfig`)
+- some venue wifi blocks device-to-device traffic even when everyone's connected to the same network — if teammates can't reach your IP, fall back to a tunnel so they hit a public URL instead:
+
+  ```powershell
+  npm run tunnel
+  ```
+
+  this prints a `https://something.loca.lt` url — send that instead of your IP. First time anyone opens it in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
+
+  if you'd rather use ngrok instead, it works the same way (`ngrok http 3000`) but requires making a free account and setting up an authtoken first — localtunnel needs neither, which is why it's the default here.
 
 ## socket events (the actual api)
 
