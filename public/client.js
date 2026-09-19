@@ -1,4 +1,6 @@
-const socket = io();
+// polling transport gets stuck through localtunnel (concurrent POST+GET
+// confuses its free tunnel), so skip straight to websocket
+const socket = io({ transports: ['websocket'] });
 
 const el = (id) => document.getElementById(id);
 const log = (msg) => {

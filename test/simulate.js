@@ -23,7 +23,7 @@ function log(...a) {
 
 async function main() {
   const sockets = [];
-  const creator = io(URL);
+  const creator = io(URL, { transports: ['websocket'] });
 
   await new Promise((resolve) => creator.on('connect', resolve));
   sockets.push(creator);
@@ -37,7 +37,7 @@ async function main() {
   log(`created room ${room.code}`);
 
   for (let i = 1; i < PLAYER_COUNT; i++) {
-    const s = io(URL);
+    const s = io(URL, { transports: ['websocket'] });
     await new Promise((resolve) => s.on('connect', resolve));
     await new Promise((resolve, reject) => {
       s.emit('join-room', { roomCode: room.code, playerName: `Bot${i}` }, (res) => {
