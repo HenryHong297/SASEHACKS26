@@ -53,8 +53,22 @@ $env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
 
 ## demoing it live
 
-- easiest: run the server on one laptop, everyone connects to `http://<that laptop's LAN IP>:3000` over the venue wifi (find your IP with `ipconfig`)
-- some venue wifi blocks device-to-device traffic even when everyone's connected to the same network — if teammates can't reach your IP, fall back to a tunnel so they hit a public URL instead:
+### option A: deploy it for real (recommended for the actual demo)
+
+Tunnels from a laptop (see option B) are fine for a quick local test but they're flaky — localtunnel's free service randomly drops connections, and the whole thing dies the second your laptop sleeps or loses wifi. For the actual demo, deploy to Render instead, which gives you a stable url that just works:
+
+1. push to GitHub (already done if you're reading this from the repo)
+2. go to https://dashboard.render.com/blueprints and connect this repo — Render will read `render.yaml` in the root and configure the build/start commands and Node version automatically
+3. click deploy. you'll get a url like `https://controlled-charge-server.onrender.com`
+
+heads up: Render's free tier disk is wiped on every redeploy/restart, so `leaderboard.db` won't persist across deploys. fine for a hackathon demo, just don't expect leaderboard history to survive you pushing a fix mid-event.
+
+also: free tier services spin down after 15 min of no traffic and take ~30s to wake back up on the next request — if judges hit a dead-looking page first, that's why, it'll load on retry.
+
+### option B: tunnel from your laptop (quick local testing only)
+
+- run the server on one laptop, everyone connects to `http://<that laptop's LAN IP>:3000` over the venue wifi (find your IP with `ipconfig`)
+- some venue wifi blocks device-to-device traffic even when everyone's connected to the same network — if teammates can't reach your IP, fall back to a tunnel:
 
   ```powershell
   npm run tunnel
@@ -62,7 +76,7 @@ $env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
 
   this tries to grab `https://controlledcharge.loca.lt` specifically (set via `--subdomain` in the `tunnel` script). Subdomains aren't reserved accounts though — it's first-come-first-served, so if someone else has it when you run this, localtunnel falls back to a random name instead and you just send whatever url it prints. First time anyone opens the link in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
 
-  if you'd rather use ngrok instead, it works the same way (`ngrok http 3000`) but requires making a free account and setting up an authtoken first — localtunnel needs neither, which is why it's the default here.
+  expect this to break periodically — it's a free shared proxy with no uptime guarantee. If a link stops responding, kill it and rerun `npm run tunnel` for a fresh one.
 
 ## socket events (the actual api)
 
