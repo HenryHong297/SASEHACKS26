@@ -14,6 +14,8 @@
   .player { padding: 6px 10px; border-radius: 6px; background: #222; }
   .player.unfocused { background: #7a1f1f; }
   #minigame { display: none; background: #333; padding: 16px; border-radius: 8px; text-align: center; }
+  #sessionTimer { font-size: 32px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  #bufferTimer { font-size: 16px; color: #e74c3c; }
   #log { font-size: 12px; color: #888; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
   .hidden { display: none; }
 </style>
@@ -38,11 +40,13 @@
     <h2>Room: <span id="roomCodeLabel"></span> — <span id="stateLabel"></span></h2>
     <button id="startBtn">Start Session</button>
 
+    <h3>Study timer</h3>
+    <div id="sessionTimer">00:00 / 00:00</div>
+    <div id="sessionBar"><div id="sessionFill"></div></div>
+
     <h3>Bomb danger buffer</h3>
     <div id="bombBar"><div id="bombFill"></div></div>
-
-    <h3>Session progress</h3>
-    <div id="sessionBar"><div id="sessionFill"></div></div>
+    <div id="bufferTimer"></div>
 
     <h3>Players</h3>
     <div class="players" id="players"></div>

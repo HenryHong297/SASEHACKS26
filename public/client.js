@@ -75,9 +75,17 @@ function renderRoom(room) {
 
 socket.on('room-state', renderRoom);
 
+const formatClock = (totalSeconds) => {
+  const m = Math.floor(totalSeconds / 60);
+  const s = Math.floor(totalSeconds % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
 socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration }) => {
   el('bombFill').style.width = `${(bombBuffer / bombBufferMax) * 100}%`;
   el('sessionFill').style.width = `${(sessionElapsed / sessionDuration) * 100}%`;
+  el('sessionTimer').textContent = `${formatClock(sessionElapsed)} / ${formatClock(sessionDuration)}`;
+  el('bufferTimer').textContent = `${bombBuffer}s until it blows`;
 });
 
 socket.on('bomb-exploded', () => log('BOOM! The bomb exploded. Someone lost focus too long.'));
