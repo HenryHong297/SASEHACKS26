@@ -10,7 +10,11 @@ const Leaderboard = require('./db/leaderboard');
 const registerSocketHandlers = require('./socket/handlers');
 
 const app = express();
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(
+  express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders: (res) => res.set('Cache-Control', 'no-store'),
+  })
+);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
