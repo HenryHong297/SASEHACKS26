@@ -4,3 +4,6 @@ leaderboard.db-wal
 leaderboard.db-shm
 .env
 .DS_Store
+server_out.log
+server_err.log
+server_pid.txt
