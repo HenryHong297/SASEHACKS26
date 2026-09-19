@@ -1,105 +1,77 @@
 # Controlled Charge — Server
 
-A real-time, focus-powered group game. 2-5 players join a room; a shared
-"bomb" has a danger buffer that drains when *anyone* looks away from their
-screen and refills when everyone's focused. Periodic study-break mini-games
-interrupt the session. Survive the full session length to defuse; let the
-buffer hit zero and it explodes. Results go on a leaderboard.
+The idea: 2-5 people join a room, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen). Stay locked in as a team long enough and you defuse it. Mini-games pop up every so often as "study breaks" to reset everyone's focus before it becomes a problem. Runs go on a leaderboard.
 
-This repo is the **server only** — a Node.js + Socket.IO backend, plus a
-minimal test client so you can exercise the game logic before the real
-webcam-based focus detection UI is ready.
+This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic before the real webcam focus-detection UI exists.
 
-## Requirements
+## what you need
 
-- Node.js **22.5+** (this project uses the built-in `node:sqlite` module —
-  no native build tools required, which matters on hackathon laptops without
-  Visual Studio installed). Check with `node -v`.
+- Node **22.5+**. We're using the built-in `node:sqlite` module instead of a normal npm sqlite package — saves everyone from needing Visual Studio Build Tools installed just to get a database working (learned that one the hard way). Check with `node -v`.
 
-## Setup
+## getting it running
 
 ```powershell
-git clone <your-repo-url>
-cd Contolled-Charge-Server
+git clone https://github.com/mdang0/SASEHACKS26.git
+cd SASEHACKS26
 npm install
-copy .env.example .env    # optional, defaults work out of the box
-npm run dev                 # starts on http://localhost:3000, auto-restarts on file changes
+copy .env.example .env   # optional, defaults work fine
+npm run dev                # http://localhost:3000, restarts itself when you save a file
 ```
 
-Open `http://localhost:3000` in two or more browser tabs (or on two laptops
-on the same WiFi, using your machine's LAN IP instead of `localhost`) to
-manually test:
+Open that url in 2+ browser tabs:
 
-1. Tab 1: "Create Room" with a team name.
-2. Tab 2+: "Join Room" using the room code shown in tab 1.
-3. Once 2+ players joined, click "Start Session" in any tab.
-4. Click "I'm FOCUSED" to toggle looking away and watch the bomb buffer bar
-   drain/refill live across all tabs.
-5. Every `MINIGAME_INTERVAL_SECONDS` (45s by default) a mini-game prompt
-   appears in all tabs — click "Complete it!" in each to resume.
-6. Session ends in either `bomb-exploded` or `bomb-defused`, and the
-   leaderboard updates.
+1. tab 1 hits "Create Room"
+2. everyone else joins with that room code
+3. hit "Start Session" once you've got 2+ people in
+4. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once
+5. every 45s a mini-game pops up everywhere, click through it in each tab to keep the session going
+6. it ends in either boom or defused, leaderboard updates either way
 
-### Automated testing (no browser needed)
+### testing without opening a browser
 
-`test/simulate.js` spins up N fake players over Socket.IO, joins them into
-one room, starts the session, and randomly toggles focus:
+`test/simulate.js` fakes a bunch of players over socket.io and randomly toggles their focus, so you can watch the bomb logic play out in a terminal instead of clicking through tabs:
 
 ```powershell
-npm start                                              # in one terminal
-npm run simulate -- --players=4 --unfocusChance=0.05   # in another
+npm start
+npm run simulate -- --players=4 --unfocusChance=0.05
 ```
 
-Tune `--unfocusChance` (0-1, probability per player per tick) to force an
-explosion (try `0.3`) or a clean defuse (try `0`). For fast iteration, shrink
-the timers via env vars so you don't wait 3 minutes per run:
+Crank `unfocusChance` up (like 0.3) to force an explosion, or down to 0 to watch it survive and hit mini-games. Also, don't wait 3 minutes every time you test — shrink the timers:
 
 ```powershell
 $env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
 ```
 
-## Team setup (2-5 people)
+## splitting up the work
 
-1. One person creates the GitHub repo and pushes this scaffold.
-2. Everyone else: `git clone`, `npm install`, then work off feature
-   branches (`git checkout -b feat/webcam-focus-detection`, etc.) and PR
-   into `main`.
-3. Suggested split of remaining work:
-   - **Server/game logic (this repo)**: tune bomb feel, room edge cases
-     (reconnects, disconnect mid-game), leaderboard queries.
-   - **Focus detection (client-side)**: use `face-api.js` or MediaPipe
-     FaceMesh in the browser to detect "looking away" (head pose / gaze /
-     eyes-closed), and call `socket.emit('focus-update', { focused })` —
-     see `public/client.js` for the exact contract already wired up.
-   - **UI/UX**: replace `public/index.html`/`client.js` with the real bomb
-     visual, timer animation, mini-game graphics, and leaderboard screen.
-     The Socket.IO event contract below is your API — build against it.
-4. Agree on one person "owning" `src/config.js` values so the game doesn't
-   feel different every time someone tweaks it before the demo.
+1. clone it, branch off (`git checkout -b feat/whatever-youre-doing`), PR into `main`
+2. rough split:
+   - **server (this repo)** — tuning how the bomb feels, handling people disconnecting mid-game, leaderboard stuff
+   - **focus detection (client side)** — face-api.js or MediaPipe in the browser to figure out when someone's looking away, then just call `socket.emit('focus-update', { focused })`. `public/client.js` already does this, copy the pattern
+   - **UI** — replace the ugly test page with real bomb visuals, a timer animation, mini-game art, a leaderboard screen. The socket events below are basically your API, build against those
+3. pick one person to own the numbers in `src/config.js` so the game doesn't feel completely different every time someone tweaks it right before the demo
 
-## Running for a live demo
+## demoing it live
 
-- Fastest: run the server on one laptop, everyone connects to
-  `http://<that-laptop's-LAN-IP>:3000` over the venue WiFi.
-- If judges need to join from outside the LAN, tunnel it:
-  `npx localtunnel --port 3000` or `ngrok http 3000`.
+- easiest: run the server on one laptop, everyone connects to `http://<that laptop's LAN IP>:3000` over the venue wifi
+- if judges need to hit it from outside the wifi: `npx localtunnel --port 3000` or `ngrok http 3000`
 
-## Socket.IO event contract
+## socket events (the actual api)
 
-Client → server:
-| Event | Payload | Ack response |
+client sends:
+| event | payload | you get back |
 |---|---|---|
 | `create-room` | `{ teamName, playerName }` | `{ room }` or `{ error }` |
 | `join-room` | `{ roomCode, playerName }` | `{ room }` or `{ error }` |
 | `start-game` | `{}` | `{ ok: true }` or `{ error }` |
-| `focus-update` | `{ focused: boolean }` | — |
-| `minigame-complete` | `{}` | — |
+| `focus-update` | `{ focused: boolean }` | nothing, just fire it |
+| `minigame-complete` | `{}` | nothing |
 | `get-leaderboard` | `{}` | `{ entries }` |
 
-Server → client (broadcast to room):
-| Event | Payload |
+server broadcasts to the room:
+| event | payload |
 |---|---|
-| `room-state` | `{ code, teamName, state, bombTimeRemaining... , players[] }` |
+| `room-state` | `{ code, teamName, state, players[], ... }` |
 | `bomb-tick` | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused }` |
 | `bomb-exploded` | `{ sessionElapsed }` |
 | `bomb-defused` | `{ sessionElapsed }` |
@@ -107,22 +79,22 @@ Server → client (broadcast to room):
 | `minigame-end` | `{}` |
 | `leaderboard-update` | `{ entries }` |
 
-## Project structure
+## where everything lives
 
 ```
 src/
-  index.js              Express + Socket.IO bootstrap
-  config.js             All tunable game constants (env-overridable)
+  index.js              express + socket.io setup
+  config.js             all the tunable numbers (override via env vars)
   rooms/
-    RoomManager.js       Room/player lifecycle (create/join/leave, in-memory)
-    BombEngine.js         Per-room tick loop: buffer drain/regen, minigames, win/lose
+    RoomManager.js       who's in what room
+    BombEngine.js         the actual game loop — buffer drain/regen, mini-games, win/lose
   db/
-    leaderboard.js        node:sqlite wrapper (writes to leaderboard.db)
+    leaderboard.js        node:sqlite, writes to leaderboard.db
     schema.sql
   socket/
-    handlers.js           Wires socket events to RoomManager/BombEngine
+    handlers.js           hooks socket events up to the room manager / bomb engine
 public/
-  index.html, client.js   Minimal manual test client (swap for real UI)
+  index.html, client.js   throwaway test client, swap for the real ui
 test/
-  simulate.js             Headless multi-client simulator
+  simulate.js             fake players for testing without a browser
 ```

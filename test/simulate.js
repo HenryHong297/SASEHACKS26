@@ -1,9 +1,8 @@
 /*
- * Spins up N fake players against a running server, joins them into one
- * room, starts the session, and randomly toggles focus to exercise the
- * bomb buffer / minigame / explode / defuse logic without a browser.
+ * fakes a bunch of players against a running server so you can watch the
+ * bomb/minigame/explode/defuse logic play out without opening a browser
  *
- * Usage: npm run simulate -- --players=4 --url=http://localhost:3000
+ * usage: npm run simulate -- --players=4 --url=http://localhost:3000
  */
 const { io } = require('socket.io-client');
 
