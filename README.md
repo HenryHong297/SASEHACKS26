@@ -60,7 +60,7 @@ $env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
   npm run tunnel
   ```
 
-  this prints a `https://something.loca.lt` url — send that instead of your IP. First time anyone opens it in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
+  this tries to grab `https://controlledcharge.loca.lt` specifically (set via `--subdomain` in the `tunnel` script). Subdomains aren't reserved accounts though — it's first-come-first-served, so if someone else has it when you run this, localtunnel falls back to a random name instead and you just send whatever url it prints. First time anyone opens the link in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
 
   if you'd rather use ngrok instead, it works the same way (`ngrok http 3000`) but requires making a free account and setting up an authtoken first — localtunnel needs neither, which is why it's the default here.
 
