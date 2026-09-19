@@ -62,7 +62,7 @@ everything runs off your own laptop — no external hosting.
   npm run tunnel
   ```
 
-  this tries to grab `https://controlledcharge.loca.lt` specifically (set via `--subdomain` in the `tunnel` script). Subdomains aren't reserved accounts though — it's first-come-first-served, so if someone else has it when you run this, localtunnel falls back to a random name instead and you just send whatever url it prints. First time anyone opens the link in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
+  this tries to grab `https://controlledchargedemo.loca.lt` specifically (set via `--subdomain` in the `tunnel` script). Subdomains aren't reserved accounts though — it's first-come-first-served, so if someone else has it when you run this, localtunnel falls back to a random name instead and you just send whatever url it prints. First time anyone opens the link in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
 
   it's a free shared proxy with no uptime guarantee, so expect it to drop occasionally — if a link stops responding, kill it and rerun `npm run tunnel` for a fresh one.
 
