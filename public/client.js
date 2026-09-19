@@ -15,7 +15,7 @@ socket.on('connect', () => {
 });
 
 el('createBtn').onclick = () => {
-  socket.emit('create-room', { teamName: el('teamName').value }, (res) => {
+  socket.emit('create-room', { teamName: el('teamName').value, playerName: el('createPlayerName').value }, (res) => {
     if (res.error) return log(`error: ${res.error}`);
     log(`created room ${res.room.code}`);
     enterGame(res.room);
