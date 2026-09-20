@@ -143,8 +143,13 @@ const formatClock = (totalSeconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+const GAUGE_RADIUS = 52;
+const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
+el('bombGauge').style.strokeDasharray = `${GAUGE_CIRCUMFERENCE}`;
+
 socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, unfocusedCount }) => {
-  el('bombFill').style.width = `${(bombBuffer / bombBufferMax) * 100}%`;
+  const ratio = bombBuffer / bombBufferMax;
+  el('bombGauge').style.strokeDashoffset = `${GAUGE_CIRCUMFERENCE * (1 - ratio)}`;
   el('sessionFill').style.width = `${(sessionElapsed / sessionDuration) * 100}%`;
   el('sessionTimer').textContent = `${formatClock(sessionElapsed)} / ${formatClock(sessionDuration)}`;
   el('bufferTimer').textContent = `${bombBuffer}s`;
