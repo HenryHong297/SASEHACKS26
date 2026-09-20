@@ -68,7 +68,7 @@ class FocusState:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._data = {"focused": True, "focusScore": 1.0, "distractions": 0, "calibrating": True}
+        self._data = {"focused": True, "focusScore": 1.0, "distractions": 0, "calibrating": True, "error": None}
 
     def update(self, **kwargs):
         with self._lock:
@@ -175,9 +175,16 @@ def main():
         )
     )
     cap = cv2.VideoCapture(args.camera)
-    if not cap.isOpened():
-        raise SystemExit(f"Could not open camera {args.camera}")
+    if not cap.isOpened() or not cap.read()[0]:
+        raise SystemExit(
+            f"Could not open camera {args.camera} (opened={cap.isOpened()}).\n"
+            "Most webcams only allow ONE application to use them at a time - this usually means\n"
+            "something else already has it open: a browser tab with the game's camera preview\n"
+            "active, Discord/Teams/Zoom running in the background, or the Windows Camera app.\n"
+            "Close/pause those (or refresh the browser tab after starting this script) and try again."
+        )
     video_start = time.time()
+    consecutive_read_failures = 0
 
     def reset_calibration():
         return {"start": time.time(), "yaw": [], "pitch": [], "base": None}
@@ -194,7 +201,17 @@ def main():
     while True:
         ok, frame = cap.read()
         if not ok:
-            break
+            consecutive_read_failures += 1
+            focus_state.update(error=f"camera read failed ({consecutive_read_failures}x in a row)")
+            print(f"[warn] camera read failed ({consecutive_read_failures}x) - is another app using it?")
+            if consecutive_read_failures >= 100:  # ~a few seconds at typical frame rates
+                raise SystemExit(
+                    "Camera stopped delivering frames. Something else likely grabbed it "
+                    "(browser tab, Discord/Teams/Zoom, Camera app) - close that and rerun."
+                )
+            time.sleep(0.05)
+            continue
+        consecutive_read_failures = 0
         h, w = frame.shape[:2]
         now = time.time()
 
@@ -214,7 +231,7 @@ def main():
                 calib["pitch"].append(pose[1])
             cv2.putText(frame, f"CALIBRATING: look at your screen ({max(0, args.calib - elapsed):.0f}s)",
                         (10, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-            focus_state.update(calibrating=True)
+            focus_state.update(calibrating=True, error=None)
             if elapsed >= args.calib and len(calib["yaw"]) > 10:
                 calib["base"] = (float(np.median(calib["yaw"])), float(np.median(calib["pitch"])))
                 session_start = now
@@ -255,7 +272,9 @@ def main():
         data_secs = samples[-1][0] - samples[0][0]
         total_frames += 1
         focused_frames += focused
-        focus_state.update(focused=focused, focusScore=focus_score, distractions=distractions, calibrating=False)
+        focus_state.update(
+            focused=focused, focusScore=focus_score, distractions=distractions, calibrating=False, error=None
+        )
 
         # ---- flags ----
         if now - last_flag > args.flag_cooldown:

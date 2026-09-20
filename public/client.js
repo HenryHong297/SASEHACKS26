@@ -47,6 +47,8 @@ async function pollTracker() {
   }
 }
 
+let lastTrackerError = null;
+
 function onTrackerReading(data) {
   if (!trackerAvailable) {
     trackerAvailable = true;
@@ -59,6 +61,17 @@ function onTrackerReading(data) {
       if (lastRoom) renderRoom(lastRoom);
     }
   }
+
+  if (data.error) {
+    el('focusToggle').textContent = `ML-Tracking.py error: ${data.error}`;
+    if (data.error !== lastTrackerError) {
+      lastTrackerError = data.error;
+      log(`ML-Tracking.py reported an error: ${data.error} (see its console window for details)`);
+    }
+    return; // stale reading while the camera's stuck - don't act on it
+  }
+  lastTrackerError = null;
+
   el('focusToggle').textContent = data.calibrating
     ? 'ML-Tracking.py is calibrating...'
     : `ML-Tracking.py: ${data.focused ? 'FOCUSED' : 'LOOKING AWAY'} (focus score ${Math.round((data.focusScore || 0) * 100)}%)`;
