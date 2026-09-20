@@ -49,7 +49,7 @@ Focus detection runs **entirely in each player's own browser** — no install, n
 
 While it's active, the "Your Focus" button becomes a disabled live readout (`FOCUSED (auto-tracked - focus score 92%, 1 distraction)` etc.) instead of something you click.
 
-If camera permission is denied, or the detector fails to load, it falls back cleanly to the manual toggle button — nothing crashes, you just click it yourself instead.
+If camera permission is denied, the camera hardware fails to open (`NotReadableError: Could not start video source` — almost always another app like Discord/Teams/Zoom/another browser tab already has the camera locked), or the detector fails to load, it falls back cleanly to the manual toggle button — nothing crashes, you just click it yourself instead. In the camera-failure case specifically, a "Retry Camera" button appears right under the toggle so you can close whatever's holding the camera and try again without reloading the whole page.
 
 **The model/runtime files are self-hosted, not loaded from a CDN.** They used to come from `cdn.jsdelivr.net` and `storage.googleapis.com`, but some networks (school/work/hotel wifi) block those outright — which silently dropped anyone on such a network back to the manual toggle with no obvious reason why. Now `src/vendorAssets.js` downloads them once (on first server boot) into `public/vendor/mediapipe/` and serves them from this server instead, so the only thing anyone ever needs to reach is the one url they're already using. Gitignored, ~26MB, downloads automatically - no setup needed, just means the very first `npm start` after a fresh clone takes a few extra seconds.
 

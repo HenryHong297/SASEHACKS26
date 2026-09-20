@@ -31,8 +31,14 @@ async function ensureLocalStream() {
     // the element regardless of whether it's actually displayed anywhere
     localVideoEl.play().catch((e) => log(`local video play() failed: ${e.message}`));
     initBrowserFocusDetector(localVideoEl); // runs entirely in this browser, on-device
+    el('cameraRetryRow').classList.add('hidden');
   } catch (e) {
     log(`camera unavailable: ${e.message}`);
+    // Most common cause: another app (Discord/Teams/Zoom/another tab) has
+    // the camera locked, or it just needed a permission click that hadn't
+    // happened yet - offer a retry instead of requiring a full page reload.
+    el('cameraErrorText').textContent = `Camera unavailable (${e.message}).`;
+    el('cameraRetryRow').classList.remove('hidden');
   }
   return localStream;
 }
@@ -216,6 +222,11 @@ el('focusToggle').onclick = () => {
   el('focusToggle').textContent = focused
     ? "I'm FOCUSED (click to look away)"
     : "LOOKING AWAY (click to refocus)";
+};
+
+el('retryCameraBtn').onclick = () => {
+  localStream = null; // clear so ensureLocalStream() actually retries instead of no-op'ing
+  ensureLocalStream();
 };
 
 function joinRoomByCode(code) {
