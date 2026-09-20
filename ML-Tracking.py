@@ -13,7 +13,9 @@ Tasks API's landmarks are drop-in compatible (.x/.y in the same normalized
 
 Setup:  pip install -r requirements.txt
 Run:    python ML-Tracking.py
-Keys:   'r' = recalibrate, 'q' = quit
+No window pops up - the annotated video streams to the web game itself
+(http://localhost:<port>/video). In the terminal, type 'r' + Enter to
+recalibrate, 'q' + Enter (or Ctrl+C) to quit.
 
 First run downloads face_landmarker.task (~4MB) from Google's official
 MediaPipe model bucket and caches it next to this script.
@@ -33,8 +35,10 @@ Integration with the Controlled Charge web game:
   This script also serves its live focus state on a local HTTP endpoint
   (http://localhost:<port>/focus) so the browser test client can poll it and
   forward real focus/unfocus events into the game over the same socket it
-  already uses for the manual toggle - no server changes needed. See
-  FocusStateServer below and public/client.js's pollLocalTracker().
+  already uses for the manual toggle - no server changes needed. Also
+  streams the annotated video to /video (see _serve_video below) so the
+  game page can show it directly instead of a desktop window. See
+  public/client.js's pollTracker() and onTrackerReading().
 """
 
 import argparse
@@ -79,6 +83,27 @@ class FocusState:
             return dict(self._data)
 
 
+class LatestFrame:
+    """Thread-safe holder for the latest JPEG-encoded annotated frame."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._jpeg = None
+        self._event = threading.Event()
+
+    def update(self, jpeg_bytes):
+        with self._lock:
+            self._jpeg = jpeg_bytes
+        self._event.set()
+
+    def wait_for_next(self, timeout=1.0):
+        """Blocks until a new frame arrives (or timeout), then returns it."""
+        self._event.wait(timeout)
+        with self._lock:
+            self._event.clear()
+            return self._jpeg
+
+
 class FocusStateHTTPHandler(BaseHTTPRequestHandler):
     def _cors_headers(self):
         # Chrome/Edge's Private Network Access policy blocks a public https
@@ -95,10 +120,14 @@ class FocusStateHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path != "/focus":
-            self.send_response(404)
-            self.end_headers()
-            return
+        if self.path == "/focus":
+            return self._serve_focus()
+        if self.path == "/video":
+            return self._serve_video()
+        self.send_response(404)
+        self.end_headers()
+
+    def _serve_focus(self):
         body = json.dumps(self.server.focus_state.snapshot()).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -107,13 +136,36 @@ class FocusStateHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _serve_video(self):
+        # MJPEG stream: browsers render this directly from a plain <img src="...">
+        # tag, no WebRTC/canvas needed. Each part is one JPEG frame.
+        boundary = "frame"
+        self.send_response(200)
+        self._cors_headers()
+        self.send_header("Content-Type", f"multipart/x-mixed-replace; boundary={boundary}")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        try:
+            while True:
+                jpeg = self.server.latest_frame.wait_for_next(timeout=2.0)
+                if jpeg is None:
+                    continue
+                self.wfile.write(f"--{boundary}\r\n".encode())
+                self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                self.wfile.write(f"Content-Length: {len(jpeg)}\r\n\r\n".encode())
+                self.wfile.write(jpeg)
+                self.wfile.write(b"\r\n")
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            pass  # viewer navigated away / closed the tab
+
     def log_message(self, *args):
-        pass  # keep the console clean, the cv2 overlay already shows status
+        pass  # keep the console clean
 
 
-def start_focus_state_server(focus_state, port):
+def start_focus_state_server(focus_state, latest_frame, port):
     server = ThreadingHTTPServer(("127.0.0.1", port), FocusStateHTTPHandler)
     server.focus_state = focus_state
+    server.latest_frame = latest_frame
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
@@ -155,6 +207,26 @@ def on_flag(reason):
     print(f"[FLAG] {time.strftime('%H:%M:%S')} - {reason}")
 
 
+def start_command_listener():
+    """No window means no cv2.waitKey, so 'r'/'q' come from typed terminal input instead."""
+    commands = {"recalibrate": False, "quit": False}
+
+    def _listen():
+        while True:
+            try:
+                cmd = input().strip().lower()
+            except EOFError:
+                return
+            if cmd == "q":
+                commands["quit"] = True
+                return
+            elif cmd == "r":
+                commands["recalibrate"] = True
+
+    threading.Thread(target=_listen, daemon=True).start()
+    return commands
+
+
 def main():
     # imported here so the math above is testable without mediapipe/cv2 installed
     import mediapipe as mp
@@ -175,8 +247,12 @@ def main():
     args = ap.parse_args()
 
     focus_state = FocusState()
-    start_focus_state_server(focus_state, args.port)
+    latest_frame = LatestFrame()
+    start_focus_state_server(focus_state, latest_frame, args.port)
     print(f"serving live focus state on http://localhost:{args.port}/focus")
+    print(f"streaming annotated video to http://localhost:{args.port}/video")
+    print("type 'r' + Enter to recalibrate, 'q' + Enter (or Ctrl+C) to quit")
+    commands = start_command_listener()
 
     model_path = ensure_face_landmarker_model()
     landmarker = vision.FaceLandmarker.create_from_options(
@@ -251,8 +327,10 @@ def main():
                 session_start = now
                 samples.clear()
                 away_since, in_distraction = None, False
-            cv2.imshow("focus tracker", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            ok2, jpg = cv2.imencode(".jpg", frame)
+            if ok2:
+                latest_frame.update(jpg.tobytes())
+            if commands["quit"]:
                 break
             continue
 
@@ -310,16 +388,17 @@ def main():
         if yaw_d is not None:
             cv2.putText(frame, f"yaw {yaw_d:+.0f}  pitch {pitch_d:+.0f}", (10, h - 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
-        cv2.imshow("focus tracker", frame)
+        ok2, jpg = cv2.imencode(".jpg", frame)
+        if ok2:
+            latest_frame.update(jpg.tobytes())
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord("q"):
+        if commands["quit"]:
             break
-        if key == ord("r"):
+        if commands["recalibrate"]:
             calib = reset_calibration()
+            commands["recalibrate"] = False
 
     cap.release()
-    cv2.destroyAllWindows()
     landmarker.close()
     if total_frames:
         print(f"\nSession: {(time.time() - session_start) / 60:.1f} min, "
@@ -327,4 +406,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nstopped")

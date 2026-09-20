@@ -28,6 +28,7 @@ async function ensureLocalStream() {
 // focus-update event the manual toggle uses. falls back to the manual toggle
 // + browser camera preview if the tracker isn't running.
 const TRACKER_URL = 'http://localhost:8765/focus';
+const TRACKER_VIDEO_URL = 'http://localhost:8765/video';
 
 async function pollTracker() {
   try {
@@ -58,8 +59,8 @@ function onTrackerReading(data) {
       // avoid two processes fighting over the same webcam
       localStream.getTracks().forEach((t) => t.stop());
       localStream = null;
-      if (lastRoom) renderRoom(lastRoom);
     }
+    if (lastRoom) renderRoom(lastRoom); // pick up the video stream in the camera box
   }
 
   if (data.error) {
@@ -182,7 +183,9 @@ function renderRoom(room) {
       video.srcObject = localStream;
       cam.appendChild(video);
     } else if (p.id === mySocketId && trackerAvailable) {
-      cam.textContent = '🎯'; // tracked by local ML-Tracking.py instead of a browser feed
+      const img = document.createElement('img');
+      img.src = TRACKER_VIDEO_URL; // MJPEG stream from ML-Tracking.py, annotated with focus overlay
+      cam.appendChild(img);
     } else {
       // placeholder until real peer video streaming is wired up
       cam.textContent = '📷';
