@@ -44,6 +44,7 @@ class RoomManager {
       id: socketId,
       name: playerName || `Player ${room.players.size + 1}`,
       focused: true,
+      unfocusedSeconds: 0,
     });
     this.socketToRoom.set(socketId, code);
     return { room };
@@ -99,6 +100,7 @@ class RoomManager {
         id: p.id,
         name: p.name,
         focused: p.focused,
+        unfocusedSeconds: p.unfocusedSeconds,
       })),
     };
   }

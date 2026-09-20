@@ -10,9 +10,16 @@
   #bombFill { height: 100%; background: #e74c3c; width: 100%; transition: width 0.2s linear; }
   #sessionBar { height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin: 8px 0; }
   #sessionFill { height: 100%; background: #2ecc71; width: 0%; transition: width 0.2s linear; }
-  .players { display: flex; gap: 8px; flex-wrap: wrap; }
-  .player { padding: 6px 10px; border-radius: 6px; background: #222; }
-  .player.unfocused { background: #7a1f1f; }
+  .players { display: flex; gap: 10px; flex-wrap: wrap; }
+  .playerCard { width: 140px; display: flex; flex-direction: column; align-items: center; gap: 6px; background: #222; padding: 8px; border-radius: 8px; }
+  .playerCard.unfocused { background: #7a1f1f; }
+  .cameraBox { width: 124px; height: 92px; background: #000; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; color: #555; font-size: 28px; }
+  .cameraBox video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .playerName { font-size: 13px; text-align: center; }
+  #roundSummary { background: #222; padding: 16px; border-radius: 8px; margin-top: 12px; }
+  .statRow { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #333; }
+  .badge.mvp { color: #2ecc71; font-weight: bold; }
+  .badge.weak { color: #e74c3c; font-weight: bold; }
   #sessionTimer { font-size: 32px; font-weight: bold; font-variant-numeric: tabular-nums; }
   #bufferTimer { font-size: 16px; color: #e74c3c; }
   #log { font-size: 12px; color: #888; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
@@ -61,6 +68,11 @@
 
     <h3>Your focus</h3>
     <button id="focusToggle">I'm FOCUSED (click to look away)</button>
+
+    <div id="roundSummary" class="hidden">
+      <h3>Round Summary</h3>
+      <div id="statsList"></div>
+    </div>
 
     <h3>Leaderboard</h3>
     <ol id="leaderboard"></ol>

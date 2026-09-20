@@ -20,11 +20,12 @@ npm run dev                # http://localhost:3000, restarts itself when you sav
 
 Open that url in 2+ browser tabs:
 
-1. tab 1 hits "Create Room"
-2. everyone else sees it show up under "Active Rooms" and clicks "Join" (or types the room code manually)
-3. hit "Start Session" once you've got 2+ people in
-4. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once
-5. it ends in either boom or defused, leaderboard updates either way
+1. tab 1 hits "Create Bomb Defusal Team"
+2. everyone else sees it show up under "Active Bomb Defusal Teams" and clicks "Join" (or types the team code manually)
+3. each tab will prompt for camera access — that's the (placeholder) camera view per player, allow it
+4. hit "Start Session" once you've got 2+ people in
+5. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once
+6. it ends in either boom or defused — a round summary shows everyone's total unfocused time, tagging the MVP (least unfocused) and Weak Link (most unfocused), and the leaderboard updates
 
 ### testing without opening a browser
 
@@ -41,43 +42,34 @@ Crank `unfocusChance` up (like 0.3) to force an explosion, or down to 0 to watch
 $env:SESSION_DURATION_SECONDS=15; npm run dev
 ```
 
-## splitting up the work
-
-1. clone it, branch off (`git checkout -b feat/whatever-youre-doing`), PR into `main`
-2. rough split:
-   - **server (this repo)** — tuning how the bomb feels, handling people disconnecting mid-game, leaderboard stuff
-   - **focus detection (client side)** — face-api.js or MediaPipe in the browser to figure out when someone's looking away, then just call `socket.emit('focus-update', { focused })`. `public/client.js` already does this, copy the pattern
-   - **UI** — replace the ugly test page with real bomb visuals, a timer animation, a leaderboard screen. The socket events below are basically your API, build against those
-3. pick one person to own the numbers in `src/config.js` so the game doesn't feel completely different every time someone tweaks it right before the demo
-
 ## demoing it live
 
-### option A: deploy it for real (recommended)
+### option A: deploy it for real
 
-Tunneling from a laptop (option B) is flaky — localtunnel's free service drops randomly, sometimes multiple times an hour, and the whole thing dies if your laptop sleeps or loses wifi. Deploy to Render instead for a url that just works:
+Tunneling from a laptop (option B) is flaky — free tunnel services can drop randomly, and the whole thing dies if your laptop sleeps or loses wifi. Deploying to Render gives a url that just works, independent of your laptop:
 
-1. push to GitHub (already done if you're reading this from the repo)
-2. go to https://dashboard.render.com/blueprints and connect this repo — Render reads `render.yaml` in the root and configures the build/start commands and Node version automatically
+1. push to GitHub
+2. go to https://dashboard.render.com/blueprints and connect the repo — Render reads `render.yaml` in the root and configures the build/start commands and Node version automatically
 3. click deploy, wait ~2-3 min for the first build. you'll get a permanent url like `https://controlled-charge-server.onrender.com`
 
-heads up:
-- free tier disk is wiped on every redeploy/restart, so `leaderboard.db` won't persist across deploys — fine for a demo, just don't expect leaderboard history to survive you pushing a fix mid-event
-- free tier services spin down after 15 min with no traffic and take ~30s to wake back up on the next request — ping the url yourself right before your demo slot so it's already awake
+heads up: free tier disk is wiped on every redeploy so `leaderboard.db` won't persist across deploys, and free tier services spin down after 15 min idle (takes ~30s to wake on the next request — ping it yourself before a demo).
 
 ### option B: tunnel from your laptop
 
 - **same wifi:** run the server, everyone connects to `http://<your laptop's LAN IP>:3000` (find your IP with `ipconfig`)
-- **outside your wifi** (or venue wifi blocks device-to-device traffic): use a tunnel so people hit a public url that forwards to your laptop:
+- **outside your wifi:** use a tunnel so people hit a public url that forwards to your laptop:
 
   ```powershell
   npm run tunnel
   ```
 
-  this uses ngrok with a free static domain (`geologic-tinfoil-evade.ngrok-free.dev`), not localtunnel — ngrok's free tier lets you claim one fixed domain that doesn't change every time you restart, and its connection is meaningfully more reliable than localtunnel's (which kept randomly 502/503ing on us). requires `ngrok config add-authtoken <your token>` to have been run once on the machine (free account at ngrok.com, no credit card). first-time visitors hit an ngrok interstitial page ("you are about to visit...") — that's normal, they click through once.
+  this uses ngrok with a free static domain (set in the `tunnel` script) — requires `ngrok config add-authtoken <your token>` once on the machine (free account at ngrok.com). first-time visitors hit an ngrok interstitial page, that's normal, they click through once. `npm run tunnel:localtunnel` is a no-account fallback but drops more often.
 
-  if you don't have ngrok set up on a given machine, `npm run tunnel:localtunnel` falls back to the old localtunnel approach — no account needed, but expect it to drop occasionally since it's a free shared proxy with no uptime guarantee.
+  either way this only works while your laptop is on, awake, and the server process is running.
 
-  either way: this only works while your laptop is on, awake, and the server process is running. closing the lid or losing wifi takes it down for everyone connected.
+### heads up: camera requires a secure context
+
+The camera view in the test client uses `getUserMedia`, which browsers only allow over **https** or on **localhost** — it silently fails to `http://<LAN-IP>:3000` (plain http). So camera works when testing at `localhost:3000` or through the https tunnel/deploy url, but not over a bare LAN IP.
 
 ## socket events (the actual api)
 
@@ -95,11 +87,13 @@ server broadcasts:
 | event | scope | payload |
 |---|---|---|
 | `rooms-list` | everyone connected | `{ rooms: [{ code, teamName, playerCount, maxPlayers }] }` — sent on connect and whenever the joinable list changes |
-| `room-state` | the room | `{ code, teamName, state, players[], ... }` |
+| `room-state` | the room | `{ code, teamName, state, players: [{ id, name, focused, unfocusedSeconds }], ... }` |
 | `bomb-tick` | the room | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused }` |
-| `bomb-exploded` | the room | `{ sessionElapsed }` |
-| `bomb-defused` | the room | `{ sessionElapsed }` |
+| `bomb-exploded` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below |
+| `bomb-defused` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below |
 | `leaderboard-update` | the room | `{ entries }` |
+
+`players` in the round summary is `[{ id, name, unfocusedSeconds }]` for everyone in the room. `mvp` is whoever had the least unfocused time, `weakLink` is whoever had the most — both are single `{ id, name, unfocusedSeconds }` objects picked from that same array, so you can match by `id`.
 
 ## where everything lives
 

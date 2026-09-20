@@ -23,6 +23,9 @@ class BombEngine {
     room.bombBufferMax = BUFFER_MAX_SECONDS;
     room.sessionElapsed = 0;
     room.sessionDuration = SESSION_DURATION_SECONDS;
+    room.players.forEach((p) => {
+      p.unfocusedSeconds = 0;
+    });
 
     this._broadcastState(room);
 
@@ -42,6 +45,10 @@ class BombEngine {
 
     const players = Array.from(room.players.values());
     const anyUnfocused = players.some((p) => !p.focused);
+
+    players.forEach((p) => {
+      if (!p.focused) p.unfocusedSeconds += TICK_INTERVAL_MS / 1000;
+    });
 
     if (anyUnfocused) {
       room.bombBuffer = Math.max(0, room.bombBuffer - BUFFER_DRAIN_PER_TICK);
@@ -73,7 +80,10 @@ class BombEngine {
     if (!room) return;
     room.state = 'exploded';
     this.stop(code);
-    this.io.to(code).emit('bomb-exploded', { sessionElapsed: room.sessionElapsed });
+    this.io.to(code).emit('bomb-exploded', {
+      sessionElapsed: room.sessionElapsed,
+      ...this._roundSummary(room),
+    });
     this.leaderboard.recordRun({
       teamName: room.teamName,
       survivalSeconds: Math.round(room.sessionElapsed),
@@ -88,7 +98,10 @@ class BombEngine {
     if (!room) return;
     room.state = 'defused';
     this.stop(code);
-    this.io.to(code).emit('bomb-defused', { sessionElapsed: room.sessionElapsed });
+    this.io.to(code).emit('bomb-defused', {
+      sessionElapsed: room.sessionElapsed,
+      ...this._roundSummary(room),
+    });
     this.leaderboard.recordRun({
       teamName: room.teamName,
       survivalSeconds: Math.round(room.sessionElapsed),
@@ -96,6 +109,19 @@ class BombEngine {
       playerCount: room.players.size,
     });
     this._broadcastLeaderboard(code);
+  }
+
+  _roundSummary(room) {
+    const players = Array.from(room.players.values()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      unfocusedSeconds: Math.round(p.unfocusedSeconds),
+    }));
+
+    const mvp = players.reduce((best, p) => (p.unfocusedSeconds < best.unfocusedSeconds ? p : best));
+    const weakLink = players.reduce((worst, p) => (p.unfocusedSeconds > worst.unfocusedSeconds ? p : worst));
+
+    return { players, mvp, weakLink };
   }
 
   _broadcastState(room) {
