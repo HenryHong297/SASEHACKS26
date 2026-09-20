@@ -1,12 +1,22 @@
 """
 Focus tracker: webcam -> focused / unfocused, with a rolling focus score.
 
-Uses MediaPipe Face Mesh (pretrained neural net) to find face landmarks, then
-estimates head yaw/pitch. "Focused" = face visible and head pointed at the screen.
+Uses MediaPipe's Face Landmarker (Tasks API, pretrained neural net) to find
+face landmarks, then estimates head yaw/pitch. "Focused" = face visible and
+head pointed at the screen.
 
-Setup:  pip install mediapipe opencv-python numpy
+Note: this uses the Tasks API (mediapipe.tasks.python.vision), not the older
+mediapipe.solutions.face_mesh - that legacy API isn't shipped for newer Python
+versions (e.g. no mediapipe.solutions on Python 3.14 at time of writing). The
+Tasks API's landmarks are drop-in compatible (.x/.y in the same normalized
+0..1 range), so head_pose() below needed no changes.
+
+Setup:  pip install -r requirements.txt
 Run:    python ML-Tracking.py
 Keys:   'r' = recalibrate, 'q' = quit
+
+First run downloads face_landmarker.task (~4MB) from Google's official
+MediaPipe model bucket and caches it next to this script.
 
 How it works:
   1. Calibration (first few seconds): look at your screen normally. Your head
@@ -29,13 +39,28 @@ Integration with the Controlled Charge web game:
 
 import argparse
 import json
+import os
 import threading
 import time
+import urllib.request
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cv2
 import numpy as np
+
+FACE_LANDMARKER_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/face_landmarker/"
+    "face_landmarker/float16/latest/face_landmarker.task"
+)
+FACE_LANDMARKER_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "face_landmarker.task")
+
+
+def ensure_face_landmarker_model(path=FACE_LANDMARKER_MODEL_PATH, url=FACE_LANDMARKER_MODEL_URL):
+    if not os.path.exists(path):
+        print(f"downloading face landmarker model to {path} ...")
+        urllib.request.urlretrieve(url, path)
+    return path
 
 
 class FocusState:
@@ -117,7 +142,9 @@ def on_flag(reason):
 
 
 def main():
-    import mediapipe as mp  # imported here so the math above is testable without it
+    # imported here so the math above is testable without mediapipe/cv2 installed
+    import mediapipe as mp
+    from mediapipe.tasks.python import BaseOptions, vision
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--camera", type=int, default=0)
@@ -137,11 +164,20 @@ def main():
     start_focus_state_server(focus_state, args.port)
     print(f"serving live focus state on http://localhost:{args.port}/focus")
 
-    face_mesh = mp.solutions.face_mesh.FaceMesh(
-        max_num_faces=1, min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    model_path = ensure_face_landmarker_model()
+    landmarker = vision.FaceLandmarker.create_from_options(
+        vision.FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=model_path),
+            running_mode=vision.RunningMode.VIDEO,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+    )
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
         raise SystemExit(f"Could not open camera {args.camera}")
+    video_start = time.time()
 
     def reset_calibration():
         return {"start": time.time(), "yaw": [], "pitch": [], "base": None}
@@ -162,10 +198,13 @@ def main():
         h, w = frame.shape[:2]
         now = time.time()
 
-        res = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        timestamp_ms = int((now - video_start) * 1000)
+        res = landmarker.detect_for_video(mp_image, timestamp_ms)
         pose = None
-        if res.multi_face_landmarks:
-            pose = head_pose(res.multi_face_landmarks[0].landmark, w, h)
+        if res.face_landmarks:
+            pose = head_pose(res.face_landmarks[0], w, h)
 
         # ---- calibration phase ----
         if calib["base"] is None:
@@ -248,6 +287,7 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
+    landmarker.close()
     if total_frames:
         print(f"\nSession: {(time.time() - session_start) / 60:.1f} min, "
               f"overall focus {focused_frames / total_frames:.0%}, distractions {distractions}")

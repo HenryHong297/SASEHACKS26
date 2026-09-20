@@ -40,7 +40,7 @@ Crank `unfocusChance` up (like 0.3) to force an explosion quickly for testing �
 
 ## real focus detection (webcam, not the manual toggle)
 
-`ML-Tracking.py` is a real webcam focus tracker — MediaPipe Face Mesh reads your head pose, calibrates a "looking at the screen" baseline, and flags you as unfocused if you look away past a grace period. It plugs into the game with **zero server changes**: it serves its live reading on a local HTTP endpoint, and `public/client.js` polls that endpoint and forwards it through the exact same `focus-update` event the manual toggle button uses.
+`ML-Tracking.py` is a real webcam focus tracker — MediaPipe's Face Landmarker reads your head pose, calibrates a "looking at the screen" baseline, and flags you as unfocused if you look away past a grace period. It plugs into the game with **zero server changes**: it serves its live reading on a local HTTP endpoint, and `public/client.js` polls that endpoint and forwards it through the exact same `focus-update` event the manual toggle button uses.
 
 ```powershell
 pip install -r requirements.txt
@@ -50,10 +50,12 @@ python ML-Tracking.py
 Then open the game in your browser as usual (`http://localhost:3000` or the tunnel url) and join/create a team. On load, the page checks `http://localhost:8765/focus` for about a second — if `ML-Tracking.py` is already running, it skips asking for camera permission (avoids two things fighting over your one webcam) and the "Your Focus" button becomes a live readout instead of something you click. If it's not running yet, everything falls back to the manual toggle + browser camera preview exactly like before, and it'll pick up the tracker automatically if you start it a bit later (checked every second).
 
 Notes:
+- First run downloads `face_landmarker.task` (~4MB, Google's official model asset) and caches it next to the script — needs internet once, then works offline.
 - Start `ML-Tracking.py` **before** opening/joining the game in the browser to avoid a brief moment where both try to grab the camera.
 - The first few seconds are calibration ("look at your screen normally") — readings during that window aren't sent to the game.
 - `--camera N` picks a different webcam if you have more than one, `--yaw-tol`/`--pitch-tol` loosen or tighten how far you can turn your head before it counts as looking away. Run `python ML-Tracking.py --help` for the full list.
 - This only tracks *your own* focus locally — it doesn't send video anywhere, just a `{focused, focusScore, distractions, calibrating}` reading to your own browser tab on the same machine.
+- Uses MediaPipe's newer Tasks API rather than the older `mediapipe.solutions.face_mesh` — that legacy API isn't shipped for newer Python versions (e.g. missing entirely on Python 3.14). If `pip install` gives you a very old/new mediapipe that behaves differently, check `python -c "from mediapipe.tasks.python import vision"` works.
 
 ## demoing it live
 

@@ -14,8 +14,12 @@ lt_pid.txt
 ngrok_out.log
 ngrok_err.log
 ngrok_pid.txt
+ml_out.log
+ml_err.log
+ml_pid.txt
 
 # Python (ML-Tracking.py)
+face_landmarker.task
 __pycache__/
 *.py[codz]
 *$py.class
