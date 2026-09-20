@@ -8,7 +8,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "simulate": "node test/simulate.js",
-    "tunnel": "npx --yes localtunnel --port 3000 --subdomain controlledchargedemo"
+    "tunnel": "ngrok http --domain=geologic-tinfoil-evade.ngrok-free.dev 3000",
+    "tunnel:localtunnel": "npx --yes localtunnel --port 3000 --subdomain controlledchargedemo"
   },
   "engines": {
     "node": ">=22.5.0"

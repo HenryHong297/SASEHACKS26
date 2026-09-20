@@ -64,7 +64,7 @@ heads up:
 - free tier disk is wiped on every redeploy/restart, so `leaderboard.db` won't persist across deploys — fine for a demo, just don't expect leaderboard history to survive you pushing a fix mid-event
 - free tier services spin down after 15 min with no traffic and take ~30s to wake back up on the next request — ping the url yourself right before your demo slot so it's already awake
 
-### option B: tunnel from your laptop (quick local testing only)
+### option B: tunnel from your laptop
 
 - **same wifi:** run the server, everyone connects to `http://<your laptop's LAN IP>:3000` (find your IP with `ipconfig`)
 - **outside your wifi** (or venue wifi blocks device-to-device traffic): use a tunnel so people hit a public url that forwards to your laptop:
@@ -73,11 +73,11 @@ heads up:
   npm run tunnel
   ```
 
-  this tries to grab `https://controlledchargedemo.loca.lt` specifically (set via `--subdomain` in the `tunnel` script). Subdomains aren't reserved accounts though — it's first-come-first-served, so if someone else has it when you run this, localtunnel falls back to a random name instead and you just send whatever url it prints. First time anyone opens the link in a browser they'll hit a "click to continue" interstitial page, that's normal for localtunnel, just click through.
+  this uses ngrok with a free static domain (`geologic-tinfoil-evade.ngrok-free.dev`), not localtunnel — ngrok's free tier lets you claim one fixed domain that doesn't change every time you restart, and its connection is meaningfully more reliable than localtunnel's (which kept randomly 502/503ing on us). requires `ngrok config add-authtoken <your token>` to have been run once on the machine (free account at ngrok.com, no credit card). first-time visitors hit an ngrok interstitial page ("you are about to visit...") — that's normal, they click through once.
 
-  it's a free shared proxy with no uptime guarantee, so expect it to drop occasionally — if a link stops responding, kill it and rerun `npm run tunnel` for a fresh one.
+  if you don't have ngrok set up on a given machine, `npm run tunnel:localtunnel` falls back to the old localtunnel approach — no account needed, but expect it to drop occasionally since it's a free shared proxy with no uptime guarantee.
 
-  this only works while your laptop is on, awake, and the server process is running. closing the lid or losing wifi takes it down for everyone connected.
+  either way: this only works while your laptop is on, awake, and the server process is running. closing the lid or losing wifi takes it down for everyone connected.
 
 ## socket events (the actual api)
 
