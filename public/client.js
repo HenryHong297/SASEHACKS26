@@ -19,7 +19,7 @@ socket.on('connect', () => {
 el('createBtn').onclick = () => {
   socket.emit('create-room', { teamName: el('teamName').value, playerName: el('createPlayerName').value }, (res) => {
     if (res.error) return log(`error: ${res.error}`);
-    log(`created room ${res.room.code}`);
+    log(`created bomb defusal team ${res.room.code}`);
     enterGame(res.room);
   });
 };
@@ -44,7 +44,7 @@ el('focusToggle').onclick = () => {
 function joinRoomByCode(code) {
   socket.emit('join-room', { roomCode: code, playerName: el('playerName').value }, (res) => {
     if (res.error) return log(`error: ${res.error}`);
-    log(`joined room ${res.room.code}`);
+    log(`joined bomb defusal team ${res.room.code}`);
     enterGame(res.room);
   });
 }
