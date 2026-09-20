@@ -1,6 +1,6 @@
 # Controlled Charge — Server
 
-The idea: 2-5 people join a room, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen). Stay locked in as a team long enough and you defuse it. Runs go on a leaderboard. The lobby shows open rooms so people can just click "Join" instead of needing a room code passed around.
+The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. Stay locked in as a team long enough and you defuse it. Runs go on a leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
 
 This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic before the real webcam focus-detection UI exists.
 
@@ -77,7 +77,7 @@ client sends:
 | event | payload | you get back |
 |---|---|---|
 | `list-rooms` | `{}` | `{ rooms }` — joinable (lobby-state) rooms only |
-| `create-room` | `{ teamName, playerName }` | `{ room }` or `{ error }` |
+| `create-room` | `{ teamName, playerName, isPrivate }` | `{ room }` or `{ error }` |
 | `join-room` | `{ roomCode, playerName }` | `{ room }` or `{ error }` |
 | `start-game` | `{}` | `{ ok: true }` or `{ error }` |
 | `focus-update` | `{ focused: boolean }` | nothing, just fire it |
@@ -86,9 +86,9 @@ client sends:
 server broadcasts:
 | event | scope | payload |
 |---|---|---|
-| `rooms-list` | everyone connected | `{ rooms: [{ code, teamName, playerCount, maxPlayers }] }` — sent on connect and whenever the joinable list changes |
-| `room-state` | the room | `{ code, teamName, state, players: [{ id, name, focused, unfocusedSeconds }], ... }` |
-| `bomb-tick` | the room | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused }` |
+| `rooms-list` | everyone connected | `{ rooms: [{ code, teamName, playerCount, maxPlayers }] }` — public, lobby-state rooms only; sent on connect and whenever the list changes |
+| `room-state` | the room | `{ code, teamName, isPrivate, state, players: [{ id, name, focused, unfocusedSeconds }], ... }` |
+| `bomb-tick` | the room | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused, unfocusedCount }` |
 | `bomb-exploded` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below |
 | `bomb-defused` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below |
 | `leaderboard-update` | the room | `{ entries }` |

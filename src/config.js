@@ -10,7 +10,7 @@ module.exports = {
 
   //Bomb logic drain and regen when focused or unfocused 
   BUFFER_MAX_SECONDS: num('BUFFER_MAX_SECONDS', 20),
-  BUFFER_DRAIN_PER_TICK: num('BUFFER_DRAIN_PER_TICK', 2), // drains this fast while >=1 player unfocused
+  BUFFER_DRAIN_PER_TICK: num('BUFFER_DRAIN_PER_TICK', 2), // multiplied by how many players are unfocused right now
   BUFFER_REGEN_PER_TICK: num('BUFFER_REGEN_PER_TICK', 1), // regens this fast while everyone focused
 
   TICK_INTERVAL_MS: num('TICK_INTERVAL_MS', 1000),

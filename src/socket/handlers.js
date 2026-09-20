@@ -12,8 +12,8 @@ function registerSocketHandlers(io, roomManager, bombEngine, leaderboard) {
       ack && ack({ rooms: roomManager.listJoinableRooms() });
     });
 
-    socket.on('create-room', ({ teamName, playerName } = {}, ack) => {
-      const room = roomManager.createRoom(teamName);
+    socket.on('create-room', ({ teamName, playerName, isPrivate } = {}, ack) => {
+      const room = roomManager.createRoom(teamName, isPrivate);
       const { error } = roomManager.joinRoom(room.code, socket.id, playerName);
       if (error) return ack && ack({ error });
 

@@ -11,7 +11,7 @@ class RoomManager {
     this.socketToRoom = new Map();
   }
 
-  createRoom(teamName) {
+  createRoom(teamName, isPrivate) {
     let code;
     do {
       code = generateRoomCode();
@@ -20,6 +20,7 @@ class RoomManager {
     const room = {
       code,
       teamName: teamName || `Team ${code}`,
+      isPrivate: !!isPrivate,
       players: new Map(), // socketId -> { id, name, focused }
       state: 'lobby', // lobby | armed | exploded | defused
       bombTimeRemaining: null,
@@ -80,7 +81,7 @@ class RoomManager {
 
   listJoinableRooms() {
     return Array.from(this.rooms.values())
-      .filter((r) => r.state === 'lobby')
+      .filter((r) => r.state === 'lobby' && !r.isPrivate)
       .map((r) => ({
         code: r.code,
         teamName: r.teamName,
@@ -93,6 +94,7 @@ class RoomManager {
     return {
       code: room.code,
       teamName: room.teamName,
+      isPrivate: room.isPrivate,
       state: room.state,
       bombTimeRemaining: room.bombTimeRemaining,
       bombDuration: room.bombDuration,

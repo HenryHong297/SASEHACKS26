@@ -29,11 +29,19 @@ socket.on('connect', () => {
 });
 
 el('createBtn').onclick = () => {
-  socket.emit('create-room', { teamName: el('teamName').value, playerName: el('createPlayerName').value }, (res) => {
-    if (res.error) return log(`error: ${res.error}`);
-    log(`created bomb defusal team ${res.room.code}`);
-    enterGame(res.room);
-  });
+  socket.emit(
+    'create-room',
+    {
+      teamName: el('teamName').value,
+      playerName: el('createPlayerName').value,
+      isPrivate: el('isPrivateCheckbox').checked,
+    },
+    (res) => {
+      if (res.error) return log(`error: ${res.error}`);
+      log(`created bomb defusal team ${res.room.code}`);
+      enterGame(res.room);
+    }
+  );
 };
 
 el('joinBtn').onclick = () => joinRoomByCode(el('roomCode').value);
@@ -69,8 +77,9 @@ function renderRoomList({ rooms }) {
     const row = document.createElement('div');
     row.className = 'roomRow';
     const label = document.createElement('span');
-    label.textContent = `${r.teamName} (${r.code}) — ${r.playerCount}/${r.maxPlayers} players`;
+    label.innerHTML = `<span class="teamName">${r.teamName}</span> <span class="meta">(${r.code}) — ${r.playerCount}/${r.maxPlayers} players</span>`;
     const joinBtn = document.createElement('button');
+    joinBtn.className = 'secondary small';
     joinBtn.textContent = 'Join';
     joinBtn.disabled = r.playerCount >= r.maxPlayers;
     joinBtn.onclick = () => joinRoomByCode(r.code);
@@ -94,6 +103,8 @@ function enterGame(room) {
 function renderRoom(room) {
   lastRoom = room;
   el('stateLabel').textContent = room.state;
+  el('stateLabel').className = `pill state-${room.state}`;
+  el('privatePill').classList.toggle('hidden', !room.isPrivate);
   const playersDiv = el('players');
   playersDiv.innerHTML = '';
   room.players.forEach((p) => {
@@ -132,11 +143,13 @@ const formatClock = (totalSeconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
-socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration }) => {
+socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, unfocusedCount }) => {
   el('bombFill').style.width = `${(bombBuffer / bombBufferMax) * 100}%`;
   el('sessionFill').style.width = `${(sessionElapsed / sessionDuration) * 100}%`;
   el('sessionTimer').textContent = `${formatClock(sessionElapsed)} / ${formatClock(sessionDuration)}`;
-  el('bufferTimer').textContent = `${bombBuffer}s until it blows`;
+  el('bufferTimer').textContent = `${bombBuffer}s`;
+  el('bufferSub').textContent =
+    unfocusedCount > 0 ? `draining fast — ${unfocusedCount} unfocused` : 'holding steady';
 });
 
 function renderRoundSummary({ players, mvp, weakLink }) {

@@ -44,14 +44,15 @@ class BombEngine {
     if (!room || room.state !== 'armed') return;
 
     const players = Array.from(room.players.values());
-    const anyUnfocused = players.some((p) => !p.focused);
+    const unfocusedCount = players.filter((p) => !p.focused).length;
 
     players.forEach((p) => {
       if (!p.focused) p.unfocusedSeconds += TICK_INTERVAL_MS / 1000;
     });
 
-    if (anyUnfocused) {
-      room.bombBuffer = Math.max(0, room.bombBuffer - BUFFER_DRAIN_PER_TICK);
+    if (unfocusedCount > 0) {
+      // more people looking away drains the buffer proportionally faster
+      room.bombBuffer = Math.max(0, room.bombBuffer - BUFFER_DRAIN_PER_TICK * unfocusedCount);
     } else {
       room.bombBuffer = Math.min(room.bombBufferMax, room.bombBuffer + BUFFER_REGEN_PER_TICK);
     }
@@ -62,7 +63,8 @@ class BombEngine {
       bombBufferMax: room.bombBufferMax,
       sessionElapsed: room.sessionElapsed,
       sessionDuration: room.sessionDuration,
-      anyUnfocused,
+      anyUnfocused: unfocusedCount > 0,
+      unfocusedCount,
     });
 
     if (room.bombBuffer <= 0) {
