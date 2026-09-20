@@ -55,19 +55,6 @@ function registerSocketHandlers(io, roomManager, bombEngine, leaderboard) {
       ack && ack({ entries: leaderboard.top(10) });
     });
 
-    // WebRTC signaling relay for peer-to-peer video between players in the
-    // same room. The server never touches the actual video/audio - it just
-    // forwards SDP offers/answers/ICE candidates between two specific
-    // sockets, same pattern for all three.
-    const relayToRoommate = (event) => ({ to, ...payload } = {}) => {
-      const room = roomManager.getRoomForSocket(socket.id);
-      if (!room || !room.players.has(to)) return; // only relay within the same room
-      io.to(to).emit(event, { from: socket.id, ...payload });
-    };
-    socket.on('webrtc-offer', relayToRoommate('webrtc-offer'));
-    socket.on('webrtc-answer', relayToRoommate('webrtc-answer'));
-    socket.on('webrtc-ice-candidate', relayToRoommate('webrtc-ice-candidate'));
-
     socket.on('disconnect', () => {
       const room = roomManager.getRoomForSocket(socket.id);
       const code = roomManager.leaveSocket(socket.id);
