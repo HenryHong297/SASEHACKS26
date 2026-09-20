@@ -23,7 +23,9 @@ async function ensureLocalStream() {
     localVideoEl.autoplay = true;
     localVideoEl.muted = true;
     localVideoEl.playsInline = true;
+    localVideoEl.className = 'mirrored'; // "selfie view" - only makes sense for your own camera
     localVideoEl.srcObject = localStream;
+    localVideoEl.play().catch((e) => log(`local video play() failed: ${e.message}`));
     attachLocalVideoIfReady(); // picks up the stream without tearing down other players' cards
     initBrowserFocusDetector(localVideoEl); // runs entirely in this browser, no server/python needed
   } catch (e) {
@@ -320,15 +322,25 @@ function getOrCreatePeerConnection(otherId) {
     if (e.candidate) socket.emit('webrtc-ice-candidate', { to: otherId, candidate: e.candidate });
   };
 
+  // These fire regardless of whether video ever shows up, so they're the
+  // key diagnostic if a peer's video stays black: "connected"/"completed"
+  // means media should be flowing; "failed"/"disconnected" almost always
+  // means NAT traversal failed and would need a TURN server (not set up -
+  // see README) to fix, not a code bug.
+  pc.oniceconnectionstatechange = () => log(`webrtc [${otherId.slice(0, 6)}] ice state: ${pc.iceConnectionState}`);
+  pc.onconnectionstatechange = () => log(`webrtc [${otherId.slice(0, 6)}] connection state: ${pc.connectionState}`);
+
   pc.ontrack = (e) => {
     let videoEl = remoteVideoEls.get(otherId);
     if (!videoEl) {
       videoEl = document.createElement('video');
       videoEl.autoplay = true;
+      videoEl.muted = true; // no audio track exists anyway, but this guarantees autoplay isn't blocked
       videoEl.playsInline = true;
       remoteVideoEls.set(otherId, videoEl);
     }
     videoEl.srcObject = e.streams[0];
+    videoEl.play().catch((err) => log(`remote video play() failed: ${err.message}`));
     attachRemoteVideoIfReady(otherId);
   };
 
