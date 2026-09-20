@@ -26,7 +26,7 @@ async function ensureLocalStream() {
     // never appended to the page - detectForVideo reads frames straight off
     // the element regardless of whether it's actually displayed anywhere
     localVideoEl.play().catch((e) => log(`local video play() failed: ${e.message}`));
-    initBrowserFocusDetector(localVideoEl); // runs entirely in this browser, no server/python needed
+    initBrowserFocusDetector(localVideoEl); // runs entirely in this browser, on-device
   } catch (e) {
     log(`camera unavailable: ${e.message}`);
   }
@@ -34,10 +34,9 @@ async function ensureLocalStream() {
 }
 
 // ---- in-browser focus detection (MediaPipe Face Landmarker, runs on-device) ----
-// Same algorithm as the ML-Tracking.py prototype (calibrate a "looking at
-// screen" baseline, grace period before a look-away counts as a distraction,
-// rolling focus score) but ported to JS so it runs automatically in every
-// player's own browser - no Python install, no local server, no per-machine setup.
+// Calibrates a "looking at screen" baseline, uses a grace period before a
+// look-away counts as a distraction, and tracks a rolling focus score - runs
+// automatically in every player's own browser, no per-machine setup needed.
 const CALIB_SECONDS = 3;
 const GRACE_SECONDS = 3;
 const YAW_TOL = 0.35; // in interocular-distance units, not degrees - see headPoseProxy
@@ -116,7 +115,7 @@ async function initBrowserFocusDetector(videoEl) {
   distractions = 0;
   detectorRunning = true;
   el('focusToggle').disabled = true;
-  log('in-browser focus detector ready - tracking automatically, no python needed');
+  log('focus detector ready - tracking automatically');
   requestAnimationFrame(() => detectLoop(videoEl));
 }
 
