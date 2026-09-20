@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,3 +217,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+=======
+node_modules/
+leaderboard.db
+leaderboard.db-wal
+leaderboard.db-shm
+.env
+.DS_Store
+server_out.log
+server_err.log
+server_pid.txt
+lt_out.log
+lt_err.log
+lt_pid.txt
+ngrok_out.log
+ngrok_err.log
+ngrok_pid.txt
+>>>>>>> origin/main
