@@ -22,10 +22,10 @@ async function ensureLocalStream() {
     localVideoEl.autoplay = true;
     localVideoEl.muted = true;
     localVideoEl.playsInline = true;
-    localVideoEl.className = 'mirrored'; // "selfie view" - only makes sense for your own camera
     localVideoEl.srcObject = localStream;
+    // never appended to the page - detectForVideo reads frames straight off
+    // the element regardless of whether it's actually displayed anywhere
     localVideoEl.play().catch((e) => log(`local video play() failed: ${e.message}`));
-    attachLocalVideoIfReady(); // picks up the stream without tearing down other players' cards
     initBrowserFocusDetector(localVideoEl); // runs entirely in this browser, no server/python needed
   } catch (e) {
     log(`camera unavailable: ${e.message}`);
@@ -258,19 +258,8 @@ function enterGame(room) {
 
 // Player cards are created once and updated in place, never torn down and
 // rebuilt - room-state broadcasts fire constantly (every focus change from
-// every player), and repeatedly removing/reinserting a live <video> element
-// on every re-render made browsers stop actually painting it, even though
-// the underlying stream kept feeding frames to the detector just fine.
-const playerCards = new Map(); // playerId -> { card, cam, name }
-
-function attachLocalVideoIfReady() {
-  if (!localVideoEl) return;
-  const entry = playerCards.get(mySocketId);
-  if (entry && !entry.cam.contains(localVideoEl)) {
-    entry.cam.textContent = '';
-    entry.cam.appendChild(localVideoEl);
-  }
-}
+// every player).
+const playerCards = new Map(); // playerId -> { card, name }
 
 function renderRoom(room) {
   el('stateLabel').textContent = room.state + (room.isPrivate ? ' (private)' : '');
@@ -282,15 +271,11 @@ function renderRoom(room) {
     let entry = playerCards.get(p.id);
     if (!entry) {
       const card = document.createElement('div');
-      const cam = document.createElement('div');
-      cam.className = 'cameraBox';
-      cam.textContent = '📷'; // placeholder until real peer video streaming is wired up
       const name = document.createElement('div');
       name.className = 'playerName';
-      card.appendChild(cam);
       card.appendChild(name);
       playersDiv.appendChild(card);
-      entry = { card, cam, name };
+      entry = { card, name };
       playerCards.set(p.id, entry);
     }
     entry.card.className = 'playerCard' + (p.focused ? '' : ' unfocused');
@@ -303,8 +288,6 @@ function renderRoom(room) {
       playerCards.delete(id);
     }
   }
-
-  attachLocalVideoIfReady();
 }
 
 socket.on('room-state', renderRoom);
