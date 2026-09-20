@@ -12,30 +12,25 @@ class Leaderboard {
     this.db.exec(fs.readFileSync(SCHEMA_PATH, 'utf8'));
 
     this._insertStmt = this.db.prepare(`
-      INSERT INTO leaderboard (team_name, survival_seconds, defused, player_count)
-      VALUES (@teamName, @survivalSeconds, @defused, @playerCount)
+      INSERT INTO leaderboard (team_name, survival_seconds, player_count)
+      VALUES (@teamName, @survivalSeconds, @playerCount)
     `);
 
     this._topStmt = this.db.prepare(`
       SELECT team_name AS teamName, survival_seconds AS survivalSeconds,
-             defused, player_count AS playerCount, created_at AS createdAt
+             player_count AS playerCount, created_at AS createdAt
       FROM leaderboard
-      ORDER BY defused DESC, survival_seconds DESC
+      ORDER BY survival_seconds DESC
       LIMIT ?
     `);
   }
 
-  recordRun({ teamName, survivalSeconds, defused, playerCount }) {
-    this._insertStmt.run({
-      teamName,
-      survivalSeconds,
-      defused: defused ? 1 : 0,
-      playerCount,
-    });
+  recordRun({ teamName, survivalSeconds, playerCount }) {
+    this._insertStmt.run({ teamName, survivalSeconds, playerCount });
   }
 
   top(limit = 10) {
-    return this._topStmt.all(limit).map((row) => ({ ...row, defused: !!row.defused }));
+    return this._topStmt.all(limit);
   }
 
   close() {

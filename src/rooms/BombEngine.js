@@ -1,10 +1,4 @@
-const {
-  SESSION_DURATION_SECONDS,
-  BUFFER_MAX_SECONDS,
-  BUFFER_DRAIN_PER_TICK,
-  BUFFER_REGEN_PER_TICK,
-  TICK_INTERVAL_MS,
-} = require('../config');
+const { BUFFER_MAX_SECONDS, BUFFER_DRAIN_PER_TICK, BUFFER_REGEN_PER_TICK, TICK_INTERVAL_MS } = require('../config');
 
 class BombEngine {
   constructor(io, roomManager, leaderboard) {
@@ -22,7 +16,6 @@ class BombEngine {
     room.bombBuffer = BUFFER_MAX_SECONDS;
     room.bombBufferMax = BUFFER_MAX_SECONDS;
     room.sessionElapsed = 0;
-    room.sessionDuration = SESSION_DURATION_SECONDS;
     room.players.forEach((p) => {
       p.unfocusedSeconds = 0;
     });
@@ -62,18 +55,12 @@ class BombEngine {
       bombBuffer: room.bombBuffer,
       bombBufferMax: room.bombBufferMax,
       sessionElapsed: room.sessionElapsed,
-      sessionDuration: room.sessionDuration,
       anyUnfocused: unfocusedCount > 0,
       unfocusedCount,
     });
 
     if (room.bombBuffer <= 0) {
       this._explode(code);
-      return;
-    }
-
-    if (room.sessionElapsed >= room.sessionDuration) {
-      this._defuse(code);
     }
   }
 
@@ -89,25 +76,6 @@ class BombEngine {
     this.leaderboard.recordRun({
       teamName: room.teamName,
       survivalSeconds: Math.round(room.sessionElapsed),
-      defused: false,
-      playerCount: room.players.size,
-    });
-    this._broadcastLeaderboard(code);
-  }
-
-  _defuse(code) {
-    const room = this.roomManager.getRoom(code);
-    if (!room) return;
-    room.state = 'defused';
-    this.stop(code);
-    this.io.to(code).emit('bomb-defused', {
-      sessionElapsed: room.sessionElapsed,
-      ...this._roundSummary(room),
-    });
-    this.leaderboard.recordRun({
-      teamName: room.teamName,
-      survivalSeconds: Math.round(room.sessionElapsed),
-      defused: true,
       playerCount: room.players.size,
     });
     this._broadcastLeaderboard(code);

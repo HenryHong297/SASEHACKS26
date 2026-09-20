@@ -22,7 +22,7 @@ class RoomManager {
       teamName: teamName || `Team ${code}`,
       isPrivate: !!isPrivate,
       players: new Map(), // socketId -> { id, name, focused }
-      state: 'lobby', // lobby | armed | exploded | defused
+      state: 'lobby', // lobby | armed | exploded
       bombTimeRemaining: null,
       bombDuration: null,
       createdAt: Date.now(),

@@ -139,10 +139,9 @@ const formatClock = (totalSeconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
-socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, unfocusedCount }) => {
+socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, unfocusedCount }) => {
   el('bombFill').style.width = `${(bombBuffer / bombBufferMax) * 100}%`;
-  el('sessionFill').style.width = `${(sessionElapsed / sessionDuration) * 100}%`;
-  el('sessionTimer').textContent = `${formatClock(sessionElapsed)} / ${formatClock(sessionDuration)}`;
+  el('sessionTimer').textContent = formatClock(sessionElapsed);
   el('bufferTimer').textContent =
     unfocusedCount > 0 ? `${bombBuffer}s until it blows (${unfocusedCount} unfocused)` : `${bombBuffer}s until it blows`;
 });
@@ -170,17 +169,13 @@ socket.on('bomb-exploded', (data) => {
   log('BOOM! The bomb exploded. Someone lost focus too long.');
   renderRoundSummary(data);
 });
-socket.on('bomb-defused', (data) => {
-  log('Session complete! Bomb defused.');
-  renderRoundSummary(data);
-});
 
 socket.on('leaderboard-update', ({ entries }) => {
   const list = el('leaderboard');
   list.innerHTML = '';
   entries.forEach((e) => {
     const li = document.createElement('li');
-    li.textContent = `${e.teamName} — ${e.survivalSeconds}s — ${e.defused ? 'DEFUSED' : 'exploded'} (${e.playerCount} players)`;
+    li.textContent = `${e.teamName} — survived ${e.survivalSeconds}s (${e.playerCount} players)`;
     list.appendChild(li);
   });
 });

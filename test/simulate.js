@@ -1,6 +1,6 @@
 /*
  * fakes a bunch of players against a running server so you can watch the
- * bomb/explode/defuse logic play out without opening a browser
+ * bomb/explode logic play out without opening a browser
  *
  * usage: npm run simulate -- --players=4 --url=http://localhost:3000
  */
@@ -50,15 +50,12 @@ async function main() {
   }
 
   sockets.forEach((s, idx) => {
-    s.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration }) => {
+    s.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed }) => {
       if (idx === 0) {
-        log(
-          `tick buffer=${bombBuffer}/${bombBufferMax} session=${sessionElapsed}/${sessionDuration}`
-        );
+        log(`tick buffer=${bombBuffer}/${bombBufferMax} session=${sessionElapsed}`);
       }
     });
     s.on('bomb-exploded', () => log('*** BOOM: bomb exploded ***'));
-    s.on('bomb-defused', () => log('*** SUCCESS: bomb defused ***'));
     s.on('leaderboard-update', ({ entries }) => log('leaderboard:', JSON.stringify(entries)));
   });
 

@@ -1,6 +1,6 @@
 # Controlled Charge — Server
 
-The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. Stay locked in as a team long enough and you defuse it. Runs go on a leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
+The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. There's no time limit — the session just runs forever, and the goal is to survive as long as possible before someone's unfocus streak blows it up. Longest survival time goes on the leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
 
 This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic before the real webcam focus-detection UI exists.
 
@@ -23,9 +23,9 @@ Open that url in 2+ browser tabs:
 1. tab 1 hits "Create Bomb Defusal Team"
 2. everyone else sees it show up under "Active Bomb Defusal Teams" and clicks "Join" (or types the team code manually)
 3. each tab will prompt for camera access — that's the (placeholder) camera view per player, allow it
-4. hit "Start Session" once you've got 2+ people in
-5. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once
-6. it ends in either boom or defused — a round summary shows everyone's total unfocused time, tagging the MVP (least unfocused) and Weak Link (most unfocused), and the leaderboard updates
+4. hit "Start Session" once you've got 2+ people in — it runs indefinitely, no timer to hit
+5. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once, faster the more tabs are "unfocused" simultaneously
+6. it only ends when it explodes — a round summary shows everyone's total unfocused time, tagging the MVP (least unfocused) and Weak Link (most unfocused), and the leaderboard updates with how long you survived
 
 ### testing without opening a browser
 
@@ -36,11 +36,7 @@ npm start
 npm run simulate -- --players=4 --unfocusChance=0.05
 ```
 
-Crank `unfocusChance` up (like 0.3) to force an explosion, or down to 0 to watch it survive to the end. Also, don't wait 3 minutes every time you test — shrink the session length:
-
-```powershell
-$env:SESSION_DURATION_SECONDS=15; npm run dev
-```
+Crank `unfocusChance` up (like 0.3) to force an explosion quickly for testing — there's no time limit, so left at 0 it'll just run forever.
 
 ## demoing it live
 
@@ -88,10 +84,9 @@ server broadcasts:
 |---|---|---|
 | `rooms-list` | everyone connected | `{ rooms: [{ code, teamName, playerCount, maxPlayers }] }` — public, lobby-state rooms only; sent on connect and whenever the list changes |
 | `room-state` | the room | `{ code, teamName, isPrivate, state, players: [{ id, name, focused, unfocusedSeconds }], ... }` |
-| `bomb-tick` | the room | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused, unfocusedCount }` |
-| `bomb-exploded` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below |
-| `bomb-defused` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below |
-| `leaderboard-update` | the room | `{ entries }` |
+| `bomb-tick` | the room | `{ bombBuffer, bombBufferMax, sessionElapsed, anyUnfocused, unfocusedCount }` — no target duration, `sessionElapsed` just counts up forever |
+| `bomb-exploded` | the room | `{ sessionElapsed, players, mvp, weakLink }` — round summary, see below. This is the only way a round ends. |
+| `leaderboard-update` | the room | `{ entries }` — `entries` is `[{ teamName, survivalSeconds, playerCount, createdAt }]`, sorted longest survival first |
 
 `players` in the round summary is `[{ id, name, unfocusedSeconds }]` for everyone in the room. `mvp` is whoever had the least unfocused time, `weakLink` is whoever had the most — both are single `{ id, name, unfocusedSeconds }` objects picked from that same array, so you can match by `id`.
 
