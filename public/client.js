@@ -13,6 +13,7 @@ let mySocketId = null;
 let localStream = null;
 let localVideoEl = null;
 let detectorReady = false;
+let currentRoom = null;
 
 async function ensureLocalStream() {
   if (localStream) return localStream;
@@ -28,6 +29,14 @@ async function ensureLocalStream() {
   } catch (e) {
     log(`camera unavailable: ${e.message}`);
   }
+  // Whether it succeeded or failed, we now know our own camera state - safe
+  // to start/answer peer connections (see the webrtc section below for why
+  // this matters).
+  localMediaResolved = true;
+  const offers = pendingOffers;
+  pendingOffers = [];
+  offers.forEach((msg) => handleOffer(msg).catch((e) => log(`webrtc offer error: ${e.message}`)));
+  if (currentRoom) syncPeerConnections(currentRoom);
   return localStream;
 }
 
@@ -270,7 +279,126 @@ function attachLocalVideoIfReady() {
   }
 }
 
+// ---- peer-to-peer video between players (WebRTC, mesh topology) ----
+// The server only relays signaling messages (webrtc-offer/answer/ice-
+// candidate) between two specific sockets in the same room - it never
+// touches the actual video. Whoever has the lexicographically smaller
+// socket id always initiates a given connection, so both sides agree on
+// who calls whom without extra coordination. Connections are only ever
+// set up once BOTH sides have resolved their own camera permission
+// (granted or denied) - deliberately sidesteps WebRTC renegotiation
+// entirely, since we can't test that against a real browser here; the
+// tradeoff is a peer's video only appears once whichever of you is
+// slower to grant camera permission finishes doing so.
+const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+const peerConnections = new Map(); // otherPlayerId -> RTCPeerConnection
+const remoteVideoEls = new Map(); // otherPlayerId -> video element
+let localMediaResolved = false;
+let pendingOffers = [];
+
+function attachRemoteVideoIfReady(otherId) {
+  const videoEl = remoteVideoEls.get(otherId);
+  const entry = playerCards.get(otherId);
+  if (videoEl && entry && !entry.cam.contains(videoEl)) {
+    entry.cam.textContent = '';
+    entry.cam.appendChild(videoEl);
+  }
+}
+
+function getOrCreatePeerConnection(otherId) {
+  let pc = peerConnections.get(otherId);
+  if (pc) return pc;
+
+  pc = new RTCPeerConnection(RTC_CONFIG);
+  peerConnections.set(otherId, pc);
+
+  if (localStream) {
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+  }
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) socket.emit('webrtc-ice-candidate', { to: otherId, candidate: e.candidate });
+  };
+
+  pc.ontrack = (e) => {
+    let videoEl = remoteVideoEls.get(otherId);
+    if (!videoEl) {
+      videoEl = document.createElement('video');
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+      remoteVideoEls.set(otherId, videoEl);
+    }
+    videoEl.srcObject = e.streams[0];
+    attachRemoteVideoIfReady(otherId);
+  };
+
+  return pc;
+}
+
+async function initiateConnection(otherId) {
+  const pc = getOrCreatePeerConnection(otherId);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit('webrtc-offer', { to: otherId, sdp: pc.localDescription });
+}
+
+async function handleOffer({ from, sdp }) {
+  const pc = getOrCreatePeerConnection(from);
+  await pc.setRemoteDescription(sdp);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  socket.emit('webrtc-answer', { to: from, sdp: pc.localDescription });
+}
+
+function closePeerConnection(otherId) {
+  const pc = peerConnections.get(otherId);
+  if (pc) pc.close();
+  peerConnections.delete(otherId);
+  remoteVideoEls.delete(otherId);
+}
+
+socket.on('webrtc-offer', (msg) => {
+  if (!localMediaResolved) {
+    pendingOffers.push(msg); // wait until we know our own camera state before answering
+    return;
+  }
+  handleOffer(msg).catch((e) => log(`webrtc offer error: ${e.message}`));
+});
+
+socket.on('webrtc-answer', async ({ from, sdp }) => {
+  const pc = peerConnections.get(from);
+  if (pc) await pc.setRemoteDescription(sdp);
+});
+
+socket.on('webrtc-ice-candidate', async ({ from, candidate }) => {
+  const pc = peerConnections.get(from);
+  if (pc && candidate) {
+    try {
+      await pc.addIceCandidate(candidate);
+    } catch (e) {
+      log(`ice candidate error: ${e.message}`);
+    }
+  }
+});
+
+function syncPeerConnections(room) {
+  if (!localMediaResolved) return; // wait until we know our own camera state before calling anyone
+  const roomPlayerIds = new Set(room.players.map((p) => p.id));
+
+  room.players.forEach((p) => {
+    if (p.id === mySocketId || peerConnections.has(p.id)) return;
+    if (mySocketId < p.id) {
+      initiateConnection(p.id).catch((e) => log(`webrtc connect error: ${e.message}`));
+    }
+  });
+
+  for (const id of peerConnections.keys()) {
+    if (!roomPlayerIds.has(id)) closePeerConnection(id);
+  }
+}
+
 function renderRoom(room) {
+  currentRoom = room;
   el('stateLabel').textContent = room.state + (room.isPrivate ? ' (private)' : '');
   const playersDiv = el('players');
   const seen = new Set();
@@ -282,7 +410,7 @@ function renderRoom(room) {
       const card = document.createElement('div');
       const cam = document.createElement('div');
       cam.className = 'cameraBox';
-      cam.textContent = '📷'; // placeholder until real peer video streaming is wired up
+      cam.textContent = '📷'; // placeholder until their video connects (or ours, if it's our own card)
       const name = document.createElement('div');
       name.className = 'playerName';
       card.appendChild(cam);
@@ -299,10 +427,15 @@ function renderRoom(room) {
     if (!seen.has(id)) {
       entry.card.remove();
       playerCards.delete(id);
+      closePeerConnection(id);
     }
   }
 
   attachLocalVideoIfReady();
+  room.players.forEach((p) => {
+    if (p.id !== mySocketId) attachRemoteVideoIfReady(p.id);
+  });
+  syncPeerConnections(room);
 }
 
 socket.on('room-state', renderRoom);

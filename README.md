@@ -2,7 +2,7 @@
 
 The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. There's no time limit — the session just runs forever, and the goal is to survive as long as possible before someone's unfocus streak blows it up. Longest survival time goes on the leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
 
-This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic. Focus detection is real, not a placeholder: it runs on-device in each player's own browser via MediaPipe — see "real focus detection" below.
+This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic. Focus detection is real, not a placeholder: it runs on-device in each player's own browser via MediaPipe — see "real focus detection" below. Players also see each other's actual camera feed via peer-to-peer video (WebRTC) — see "seeing each other's cameras" below.
 
 ## what you need
 
@@ -68,6 +68,20 @@ python ML-Tracking.py
 
 It doesn't open a desktop window — it streams its annotated video (FOCUSED/UNFOCUSED overlay burned into the frame) over a local MJPEG endpoint at `http://localhost:8765/video`, and its JSON reading at `http://localhost:8765/focus`, purely for standalone viewing/debugging. It's not currently wired into the game page (that integration was replaced by the in-browser detector above). In the terminal, type `r` + Enter to force a recalibration, `q` + Enter (or Ctrl+C) to quit. First run downloads `face_landmarker.task` (~4MB, Google's official model asset) and caches it next to the script.
 
+## seeing each other's cameras (WebRTC)
+
+Each player's camera box shows their own real video feed by default — this section covers *everyone else's*. Players connect to each other directly with WebRTC (peer-to-peer, mesh topology: in a 5-person team that's up to 10 direct connections). The server never sees or touches the actual video, it only relays three small signaling messages (`webrtc-offer`, `webrtc-answer`, `webrtc-ice-candidate`) between two specific players in the same room, same pattern as everything else in this game — no new server state, just a stateless relay in `src/socket/handlers.js`.
+
+How connections get established:
+- Whoever has the lexicographically smaller socket id always initiates a given connection — both sides agree on this independently with no extra back-and-forth, which avoids both players trying to call each other at once.
+- A connection is only ever set up once **both** sides have already resolved their own camera permission (granted or denied) — if you grant permission quickly and a teammate takes 10 seconds to click "Allow," their video shows up in your camera box about 10 seconds after they click it, not before. This trades a small delay for sidestepping WebRTC renegotiation entirely, which needs real back-and-forth testing across multiple browsers to get right and wasn't practical to verify without that available.
+- When someone leaves the room, their peer connection is closed and their camera box reverts to the 📷 placeholder.
+
+Known limitations:
+- **No TURN server** — connections use a public STUN server (`stun:stun.l.google.com:19302`) for NAT traversal only. This works fine for players on the same network or with typical home/venue NATs, but can fail to connect across strict corporate firewalls or symmetric NATs, where a TURN relay would be required. If a peer's video never appears despite both sides having granted camera access, this is the most likely reason — check the browser console for ICE connection failures.
+- If your own camera permission is denied (or you're on a plain `http://<LAN-IP>:3000` link where `getUserMedia` doesn't work at all), you can still be seen and heard by others if they connect first — you just won't have any tracks to send, so your own video box stays empty for them too.
+- No video/audio ever touches the game server; it flows directly between browsers once the connection is set up.
+
 ## demoing it live
 
 ### option A: deploy it for real
@@ -108,6 +122,8 @@ client sends:
 | `start-game` | `{}` | `{ ok: true }` or `{ error }` |
 | `focus-update` | `{ focused: boolean }` | nothing, just fire it |
 | `get-leaderboard` | `{}` | `{ entries }` |
+| `webrtc-offer` / `webrtc-answer` | `{ to: socketId, sdp }` | nothing - relayed to `to` as `{ from: yourSocketId, sdp }` if they're in the same room, dropped otherwise |
+| `webrtc-ice-candidate` | `{ to: socketId, candidate }` | nothing - relayed the same way as above |
 
 server broadcasts:
 | event | scope | payload |
@@ -133,9 +149,9 @@ src/
     leaderboard.js        node:sqlite, writes to leaderboard.db
     schema.sql
   socket/
-    handlers.js           hooks socket events up to the room manager / bomb engine
+    handlers.js           hooks socket events up to the room manager / bomb engine, plus the webrtc signaling relay
 public/
-  index.html, client.js   test client - client.js does real in-browser focus detection (MediaPipe), swap the UI for the real one whenever
+  index.html, client.js   test client - client.js does real in-browser focus detection (MediaPipe) and peer video (WebRTC), swap the UI for the real one whenever
 test/
   simulate.js             fake players for testing without a browser
 ML-Tracking.py            optional standalone Python focus tracker (not wired into the game anymore)
