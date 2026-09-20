@@ -2,7 +2,7 @@
 
 The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. There's no time limit — the session just runs forever, and the goal is to survive as long as possible before someone's unfocus streak blows it up. Longest survival time goes on the leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
 
-This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic, plus a real webcam focus tracker (`ML-Tracking.py`) that plugs into it — see "real focus detection" below.
+This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic. Focus detection is real, not a placeholder: it runs on-device in each player's own browser via MediaPipe — see "real focus detection" below.
 
 ## what you need
 
@@ -22,9 +22,9 @@ Open that url in 2+ browser tabs:
 
 1. tab 1 hits "Create Bomb Defusal Team"
 2. everyone else sees it show up under "Active Bomb Defusal Teams" and clicks "Join" (or types the team code manually)
-3. each tab will prompt for camera access (unless you're running the real tracker — see below), allow it
+3. each tab will prompt for camera access — allow it. This isn't just a preview: your browser starts genuinely detecting whether you're looking at the screen (see "real focus detection" below), no extra setup needed
 4. hit "Start Session" once you've got 2+ people in — it runs indefinitely, no timer to hit
-5. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once, faster the more tabs are "unfocused" simultaneously
+5. look away from your screen for a few seconds in one tab — watch the bomb bar drain live in every tab at once, faster the more people are "unfocused" simultaneously. (If camera access was denied or the detector failed to load, that tab falls back to a manual "I'm FOCUSED" toggle button instead.)
 6. it only ends when it explodes — a round summary shows everyone's total unfocused time, tagging the MVP (least unfocused) and Weak Link (most unfocused), and the leaderboard updates with how long you survived
 
 ### testing without opening a browser
@@ -40,27 +40,33 @@ Crank `unfocusChance` up (like 0.3) to force an explosion quickly for testing �
 
 ## real focus detection (webcam, not the manual toggle)
 
-`ML-Tracking.py` is a real webcam focus tracker — MediaPipe's Face Landmarker reads your head pose, calibrates a "looking at the screen" baseline, and flags you as unfocused if you look away past a grace period. It plugs into the game with **zero server changes**: it serves its live reading on a local HTTP endpoint, and `public/client.js` polls that endpoint and forwards it through the exact same `focus-update` event the manual toggle button uses.
+Focus detection runs **entirely in each player's own browser** — no install, no separate terminal, no per-player setup. The moment you grant camera access, `public/client.js` loads MediaPipe's Face Landmarker (via `@mediapipe/tasks-vision`, straight from a CDN, on-device — no server or network round-trip once it's loaded) and:
 
-It doesn't open a desktop window — the annotated video (with the FOCUSED/UNFOCUSED overlay burned in) streams straight into your own player card on the game page instead, via a plain MJPEG stream over HTTP.
+1. Calibrates a "looking at the screen" baseline over the first few seconds (look at your screen normally)
+2. Every frame, checks whether your head position has drifted from that baseline past a tolerance
+3. Only counts it as a distraction after a short grace period, so quick glances away don't hurt you
+4. Calls `socket.emit('focus-update', ...)` whenever your focused/unfocused state actually changes — the exact same event the manual toggle button uses, so the server and `BombEngine` don't know or care where the signal came from
+
+While it's active, the "Your Focus" button becomes a disabled live readout (`FOCUSED (auto-tracked - focus score 92%, 1 distraction)` etc.) instead of something you click, and your own camera box on the game page shows your live video feed.
+
+If camera permission is denied, or the detector fails to load (offline, CDN blocked, etc.), it falls back cleanly to the manual toggle button — nothing crashes, you just click it yourself instead.
+
+Notes:
+- Needs a **secure context** — works on `localhost` or any `https://` url (the ngrok tunnel, a real deploy), but browsers block `getUserMedia` entirely on a plain `http://<LAN-IP>:3000` link. See the callout further down.
+- The head-direction math is a simple, scale-invariant proxy from raw landmark positions (nose position relative to the eye midpoint, normalized by interocular distance), not real yaw/pitch degrees — deliberately avoids depending on the exact matrix layout MediaPipe's transformation-matrix output uses, which isn't documented and wasn't practical to verify without a browser in the loop while building this. It's calibrated per-person per-session, so the units don't need to mean anything universal, just be consistent.
+- Tunable constants are in `public/client.js`: `CALIB_SECONDS`, `GRACE_SECONDS`, `YAW_TOL`/`PITCH_TOL`, `WINDOW_SECONDS`.
+- This only runs locally in your browser — no video or focus data is ever sent anywhere except the plain `{focused: true/false}` signal to the game server, same as the manual toggle always did.
+
+### ML-Tracking.py (optional standalone alternative)
+
+`ML-Tracking.py` is a separate, earlier prototype of the same idea, built in Python with OpenCV — same calibration/grace-period/rolling-score approach, ported to MediaPipe's Tasks API. It's no longer required for the game (the browser does its own detection now), but it still works standalone if you want a Python-side experiment or a second opinion on your focus score:
 
 ```powershell
 pip install -r requirements.txt
 python ML-Tracking.py
 ```
 
-Then open the game in your browser as usual (`http://localhost:3000` or the tunnel url) and join/create a team. On load, the page checks `http://localhost:8765/focus` for about a second — if `ML-Tracking.py` is already running, it skips asking for camera permission (avoids two things fighting over your one webcam), your camera box shows the tracker's live video feed, and the "Your Focus" button becomes a live readout instead of something you click. If it's not running yet, everything falls back to the manual toggle + browser camera preview exactly like before, and it'll pick up the tracker automatically if you start it a bit later (checked every second).
-
-**If you're testing over a public url (ngrok/deployed), not `localhost:3000`:** the browser will show a one-time popup like *"this site wants to access devices on your local network"* — click **Allow**. This is a real Chrome/Edge security prompt (Private Network Access) that only you can click; it's not something the code can bypass, since a public page reaching into your localhost is exactly the kind of thing it exists to gate. If you accidentally clicked Block, reset it from the site info icon next to the address bar (look for a "Local network" permission) and refresh.
-
-Notes:
-- No window pops up. In the terminal, type `r` + Enter to force a recalibration, `q` + Enter (or Ctrl+C) to quit.
-- First run downloads `face_landmarker.task` (~4MB, Google's official model asset) and caches it next to the script — needs internet once, then works offline.
-- Start `ML-Tracking.py` **before** opening/joining the game in the browser to avoid a brief moment where both try to grab the camera.
-- The first few seconds are calibration ("look at your screen normally") — readings during that window aren't sent to the game.
-- `--camera N` picks a different webcam if you have more than one, `--yaw-tol`/`--pitch-tol` loosen or tighten how far you can turn your head before it counts as looking away. Run `python ML-Tracking.py --help` for the full list.
-- This only runs locally — the video and focus readings never leave your own machine; the browser just fetches `localhost:8765` on the same computer, same as if the game weren't involved at all.
-- Uses MediaPipe's newer Tasks API rather than the older `mediapipe.solutions.face_mesh` — that legacy API isn't shipped for newer Python versions (e.g. missing entirely on Python 3.14). If `pip install` gives you a very old/new mediapipe that behaves differently, check `python -c "from mediapipe.tasks.python import vision"` works.
+It doesn't open a desktop window — it streams its annotated video (FOCUSED/UNFOCUSED overlay burned into the frame) over a local MJPEG endpoint at `http://localhost:8765/video`, and its JSON reading at `http://localhost:8765/focus`, purely for standalone viewing/debugging. It's not currently wired into the game page (that integration was replaced by the in-browser detector above). In the terminal, type `r` + Enter to force a recalibration, `q` + Enter (or Ctrl+C) to quit. First run downloads `face_landmarker.task` (~4MB, Google's official model asset) and caches it next to the script.
 
 ## demoing it live
 
@@ -89,7 +95,7 @@ heads up: free tier disk is wiped on every redeploy so `leaderboard.db` won't pe
 
 ### heads up: camera requires a secure context
 
-The camera view in the test client uses `getUserMedia`, which browsers only allow over **https** or on **localhost** — it silently fails to `http://<LAN-IP>:3000` (plain http). So camera works when testing at `localhost:3000` or through the https tunnel/deploy url, but not over a bare LAN IP.
+Real focus detection needs `getUserMedia`, which browsers only allow over **https** or on **localhost** — it silently fails to `http://<LAN-IP>:3000` (plain http). So it works when testing at `localhost:3000` or through the https tunnel/deploy url, but not over a bare LAN IP (that tab just falls back to the manual toggle instead).
 
 ## socket events (the actual api)
 
@@ -129,9 +135,9 @@ src/
   socket/
     handlers.js           hooks socket events up to the room manager / bomb engine
 public/
-  index.html, client.js   throwaway test client, swap for the real ui
+  index.html, client.js   test client - client.js does real in-browser focus detection (MediaPipe), swap the UI for the real one whenever
 test/
   simulate.js             fake players for testing without a browser
-ML-Tracking.py            real webcam focus tracker (Python) - serves live readings on :8765/focus
-requirements.txt          pip deps for ML-Tracking.py
+ML-Tracking.py            optional standalone Python focus tracker (not wired into the game anymore)
+requirements.txt          pip deps for ML-Tracking.py, if you use it
 ```
