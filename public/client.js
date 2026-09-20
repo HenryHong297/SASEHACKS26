@@ -219,7 +219,13 @@ el('focusToggle').onclick = () => {
 };
 
 function joinRoomByCode(code) {
-  socket.emit('join-room', { roomCode: code, playerName: el('playerName').value }, (res) => {
+  let playerName = el('playerName').value.trim();
+  if (!playerName) {
+    playerName = (prompt('Enter your name to join:') || '').trim();
+    if (!playerName) return; // cancelled or left blank - don't join without a name
+    el('playerName').value = playerName;
+  }
+  socket.emit('join-room', { roomCode: code, playerName }, (res) => {
     if (res.error) return log(`error: ${res.error}`);
     log(`joined bomb defusal team ${res.room.code}`);
     enterGame(res.room);
