@@ -4,8 +4,6 @@ const {
   BUFFER_DRAIN_PER_TICK,
   BUFFER_REGEN_PER_TICK,
   TICK_INTERVAL_MS,
-  MINIGAME_INTERVAL_SECONDS,
-  MINIGAME_TIMEOUT_SECONDS,
 } = require('../config');
 
 class BombEngine {
@@ -14,7 +12,6 @@ class BombEngine {
     this.roomManager = roomManager;
     this.leaderboard = leaderboard;
     this.intervals = new Map(); // code -> interval handle
-    this.minigameTimeouts = new Map(); // code -> timeout handle
   }
 
   start(code) {
@@ -26,7 +23,6 @@ class BombEngine {
     room.bombBufferMax = BUFFER_MAX_SECONDS;
     room.sessionElapsed = 0;
     room.sessionDuration = SESSION_DURATION_SECONDS;
-    room.lastMinigameAt = 0;
 
     this._broadcastState(room);
 
@@ -38,10 +34,6 @@ class BombEngine {
     const handle = this.intervals.get(code);
     if (handle) clearInterval(handle);
     this.intervals.delete(code);
-
-    const mgHandle = this.minigameTimeouts.get(code);
-    if (mgHandle) clearTimeout(mgHandle);
-    this.minigameTimeouts.delete(code);
   }
 
   _tick(code) {
@@ -73,53 +65,7 @@ class BombEngine {
 
     if (room.sessionElapsed >= room.sessionDuration) {
       this._defuse(code);
-      return;
     }
-
-    if (room.sessionElapsed - room.lastMinigameAt >= MINIGAME_INTERVAL_SECONDS) {
-      room.lastMinigameAt = room.sessionElapsed;
-      this._startMinigame(code);
-    }
-  }
-
-  _startMinigame(code) {
-    const room = this.roomManager.getRoom(code);
-    if (!room || room.state !== 'armed') return;
-
-    room.state = 'minigame';
-    room.minigameCompletedBy = new Set();
-    const type = ['reaction-tap', 'pattern-match', 'quick-math'][
-      Math.floor(Math.random() * 3)
-    ];
-    room.minigameType = type;
-
-    this.io.to(code).emit('minigame-start', { type, timeout: MINIGAME_TIMEOUT_SECONDS });
-
-    const handle = setTimeout(() => this._endMinigame(code), MINIGAME_TIMEOUT_SECONDS * 1000);
-    this.minigameTimeouts.set(code, handle);
-  }
-
-  playerCompletedMinigame(code, socketId) {
-    const room = this.roomManager.getRoom(code);
-    if (!room || room.state !== 'minigame') return;
-    room.minigameCompletedBy.add(socketId);
-
-    if (room.minigameCompletedBy.size >= room.players.size) {
-      this._endMinigame(code);
-    }
-  }
-
-  _endMinigame(code) {
-    const room = this.roomManager.getRoom(code);
-    if (!room || room.state !== 'minigame') return;
-
-    const handle = this.minigameTimeouts.get(code);
-    if (handle) clearTimeout(handle);
-    this.minigameTimeouts.delete(code);
-
-    room.state = 'armed';
-    room.minigameCompletedBy = new Set();
-    this.io.to(code).emit('minigame-end', {});
   }
 
   _explode(code) {

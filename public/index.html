@@ -13,11 +13,14 @@
   .players { display: flex; gap: 8px; flex-wrap: wrap; }
   .player { padding: 6px 10px; border-radius: 6px; background: #222; }
   .player.unfocused { background: #7a1f1f; }
-  #minigame { display: none; background: #333; padding: 16px; border-radius: 8px; text-align: center; }
   #sessionTimer { font-size: 32px; font-weight: bold; font-variant-numeric: tabular-nums; }
   #bufferTimer { font-size: 16px; color: #e74c3c; }
   #log { font-size: 12px; color: #888; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
   .hidden { display: none; }
+  #roomList { display: flex; flex-direction: column; gap: 6px; }
+  .roomRow { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 8px 12px; border-radius: 6px; }
+  .roomRow button { margin: 0; }
+  #roomListEmpty { color: #888; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -34,6 +37,11 @@
       <input id="playerName" placeholder="Your name" />
       <button id="joinBtn">Join Room</button>
     </div>
+
+    <h3>Active Rooms</h3>
+    <p style="color:#888; font-size:14px; margin:0 0 8px;">uses the name typed above under "Room code"</p>
+    <div id="roomList"></div>
+    <div id="roomListEmpty">no open rooms right now — create one!</div>
   </div>
 
   <div id="game" class="hidden">
@@ -53,11 +61,6 @@
 
     <h3>Your focus</h3>
     <button id="focusToggle">I'm FOCUSED (click to look away)</button>
-
-    <div id="minigame">
-      <h3>Study Break Mini-Game: <span id="minigameType"></span></h3>
-      <button id="minigameCompleteBtn">Complete it!</button>
-    </div>
 
     <h3>Leaderboard</h3>
     <ol id="leaderboard"></ol>

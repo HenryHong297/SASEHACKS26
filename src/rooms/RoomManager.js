@@ -21,7 +21,7 @@ class RoomManager {
       code,
       teamName: teamName || `Team ${code}`,
       players: new Map(), // socketId -> { id, name, focused }
-      state: 'lobby', // lobby | armed | minigame | exploded | defused
+      state: 'lobby', // lobby | armed | exploded | defused
       bombTimeRemaining: null,
       bombDuration: null,
       createdAt: Date.now(),
@@ -75,6 +75,17 @@ class RoomManager {
     if (!player) return null;
     player.focused = focused;
     return room;
+  }
+
+  listJoinableRooms() {
+    return Array.from(this.rooms.values())
+      .filter((r) => r.state === 'lobby')
+      .map((r) => ({
+        code: r.code,
+        teamName: r.teamName,
+        playerCount: r.players.size,
+        maxPlayers: MAX_PLAYERS_PER_ROOM,
+      }));
   }
 
   roomPublicState(room) {

@@ -1,6 +1,6 @@
 /*
  * fakes a bunch of players against a running server so you can watch the
- * bomb/minigame/explode/defuse logic play out without opening a browser
+ * bomb/explode/defuse logic play out without opening a browser
  *
  * usage: npm run simulate -- --players=4 --url=http://localhost:3000
  */
@@ -56,10 +56,6 @@ async function main() {
           `tick buffer=${bombBuffer}/${bombBufferMax} session=${sessionElapsed}/${sessionDuration}`
         );
       }
-    });
-    s.on('minigame-start', ({ type }) => {
-      log(`[player ${idx}] minigame-start: ${type}`);
-      setTimeout(() => s.emit('minigame-complete'), 500 + Math.random() * 1000);
     });
     s.on('bomb-exploded', () => log('*** BOOM: bomb exploded ***'));
     s.on('bomb-defused', () => log('*** SUCCESS: bomb defused ***'));

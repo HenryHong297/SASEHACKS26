@@ -1,6 +1,6 @@
 # Controlled Charge — Server
 
-The idea: 2-5 people join a room, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen). Stay locked in as a team long enough and you defuse it. Mini-games pop up every so often as "study breaks" to reset everyone's focus before it becomes a problem. Runs go on a leaderboard.
+The idea: 2-5 people join a room, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen). Stay locked in as a team long enough and you defuse it. Runs go on a leaderboard. The lobby shows open rooms so people can just click "Join" instead of needing a room code passed around.
 
 This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic before the real webcam focus-detection UI exists.
 
@@ -21,11 +21,10 @@ npm run dev                # http://localhost:3000, restarts itself when you sav
 Open that url in 2+ browser tabs:
 
 1. tab 1 hits "Create Room"
-2. everyone else joins with that room code
+2. everyone else sees it show up under "Active Rooms" and clicks "Join" (or types the room code manually)
 3. hit "Start Session" once you've got 2+ people in
 4. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once
-5. every 45s a mini-game pops up everywhere, click through it in each tab to keep the session going
-6. it ends in either boom or defused, leaderboard updates either way
+5. it ends in either boom or defused, leaderboard updates either way
 
 ### testing without opening a browser
 
@@ -36,10 +35,10 @@ npm start
 npm run simulate -- --players=4 --unfocusChance=0.05
 ```
 
-Crank `unfocusChance` up (like 0.3) to force an explosion, or down to 0 to watch it survive and hit mini-games. Also, don't wait 3 minutes every time you test — shrink the timers:
+Crank `unfocusChance` up (like 0.3) to force an explosion, or down to 0 to watch it survive to the end. Also, don't wait 3 minutes every time you test — shrink the session length:
 
 ```powershell
-$env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
+$env:SESSION_DURATION_SECONDS=15; npm run dev
 ```
 
 ## splitting up the work
@@ -48,7 +47,7 @@ $env:SESSION_DURATION_SECONDS=15; $env:MINIGAME_INTERVAL_SECONDS=5; npm run dev
 2. rough split:
    - **server (this repo)** — tuning how the bomb feels, handling people disconnecting mid-game, leaderboard stuff
    - **focus detection (client side)** — face-api.js or MediaPipe in the browser to figure out when someone's looking away, then just call `socket.emit('focus-update', { focused })`. `public/client.js` already does this, copy the pattern
-   - **UI** — replace the ugly test page with real bomb visuals, a timer animation, mini-game art, a leaderboard screen. The socket events below are basically your API, build against those
+   - **UI** — replace the ugly test page with real bomb visuals, a timer animation, a leaderboard screen. The socket events below are basically your API, build against those
 3. pick one person to own the numbers in `src/config.js` so the game doesn't feel completely different every time someone tweaks it right before the demo
 
 ## demoing it live
@@ -73,23 +72,22 @@ either way: this only works while your laptop is on, awake, and the server proce
 client sends:
 | event | payload | you get back |
 |---|---|---|
+| `list-rooms` | `{}` | `{ rooms }` — joinable (lobby-state) rooms only |
 | `create-room` | `{ teamName, playerName }` | `{ room }` or `{ error }` |
 | `join-room` | `{ roomCode, playerName }` | `{ room }` or `{ error }` |
 | `start-game` | `{}` | `{ ok: true }` or `{ error }` |
 | `focus-update` | `{ focused: boolean }` | nothing, just fire it |
-| `minigame-complete` | `{}` | nothing |
 | `get-leaderboard` | `{}` | `{ entries }` |
 
-server broadcasts to the room:
-| event | payload |
-|---|---|
-| `room-state` | `{ code, teamName, state, players[], ... }` |
-| `bomb-tick` | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused }` |
-| `bomb-exploded` | `{ sessionElapsed }` |
-| `bomb-defused` | `{ sessionElapsed }` |
-| `minigame-start` | `{ type, timeout }` |
-| `minigame-end` | `{}` |
-| `leaderboard-update` | `{ entries }` |
+server broadcasts:
+| event | scope | payload |
+|---|---|---|
+| `rooms-list` | everyone connected | `{ rooms: [{ code, teamName, playerCount, maxPlayers }] }` — sent on connect and whenever the joinable list changes |
+| `room-state` | the room | `{ code, teamName, state, players[], ... }` |
+| `bomb-tick` | the room | `{ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, anyUnfocused }` |
+| `bomb-exploded` | the room | `{ sessionElapsed }` |
+| `bomb-defused` | the room | `{ sessionElapsed }` |
+| `leaderboard-update` | the room | `{ entries }` |
 
 ## where everything lives
 
@@ -99,7 +97,7 @@ src/
   config.js             all the tunable numbers (override via env vars)
   rooms/
     RoomManager.js       who's in what room
-    BombEngine.js         the actual game loop — buffer drain/regen, mini-games, win/lose
+    BombEngine.js         the actual game loop — buffer drain/regen, win/lose
   db/
     leaderboard.js        node:sqlite, writes to leaderboard.db
     schema.sql

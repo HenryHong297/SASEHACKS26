@@ -24,17 +24,7 @@ el('createBtn').onclick = () => {
   });
 };
 
-el('joinBtn').onclick = () => {
-  socket.emit(
-    'join-room',
-    { roomCode: el('roomCode').value, playerName: el('playerName').value },
-    (res) => {
-      if (res.error) return log(`error: ${res.error}`);
-      log(`joined room ${res.room.code}`);
-      enterGame(res.room);
-    }
-  );
-};
+el('joinBtn').onclick = () => joinRoomByCode(el('roomCode').value);
 
 el('startBtn').onclick = () => {
   socket.emit('start-game', {}, (res) => {
@@ -51,10 +41,34 @@ el('focusToggle').onclick = () => {
     : "LOOKING AWAY (click to refocus)";
 };
 
-el('minigameCompleteBtn').onclick = () => {
-  socket.emit('minigame-complete');
-  el('minigame').style.display = 'none';
-};
+function joinRoomByCode(code) {
+  socket.emit('join-room', { roomCode: code, playerName: el('playerName').value }, (res) => {
+    if (res.error) return log(`error: ${res.error}`);
+    log(`joined room ${res.room.code}`);
+    enterGame(res.room);
+  });
+}
+
+function renderRoomList({ rooms }) {
+  const listDiv = el('roomList');
+  listDiv.innerHTML = '';
+  el('roomListEmpty').style.display = rooms.length ? 'none' : 'block';
+  rooms.forEach((r) => {
+    const row = document.createElement('div');
+    row.className = 'roomRow';
+    const label = document.createElement('span');
+    label.textContent = `${r.teamName} (${r.code}) — ${r.playerCount}/${r.maxPlayers} players`;
+    const joinBtn = document.createElement('button');
+    joinBtn.textContent = 'Join';
+    joinBtn.disabled = r.playerCount >= r.maxPlayers;
+    joinBtn.onclick = () => joinRoomByCode(r.code);
+    row.appendChild(label);
+    row.appendChild(joinBtn);
+    listDiv.appendChild(row);
+  });
+}
+
+socket.on('rooms-list', renderRoomList);
 
 function enterGame(room) {
   el('lobby').classList.add('hidden');
@@ -92,17 +106,6 @@ socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDura
 
 socket.on('bomb-exploded', () => log('BOOM! The bomb exploded. Someone lost focus too long.'));
 socket.on('bomb-defused', () => log('Session complete! Bomb defused.'));
-
-socket.on('minigame-start', ({ type, timeout }) => {
-  el('minigameType').textContent = type;
-  el('minigame').style.display = 'block';
-  log(`minigame started: ${type} (${timeout}s)`);
-});
-
-socket.on('minigame-end', () => {
-  el('minigame').style.display = 'none';
-  log('minigame ended, back to focus mode');
-});
 
 socket.on('leaderboard-update', ({ entries }) => {
   const list = el('leaderboard');

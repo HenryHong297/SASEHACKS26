@@ -14,8 +14,4 @@ module.exports = {
   BUFFER_REGEN_PER_TICK: num('BUFFER_REGEN_PER_TICK', 1), // regens this fast while everyone focused
 
   TICK_INTERVAL_MS: num('TICK_INTERVAL_MS', 1000),
-
-  // mini-games interrupt the session every so often to keep people locked in
-  MINIGAME_INTERVAL_SECONDS: num('MINIGAME_INTERVAL_SECONDS', 45),
-  MINIGAME_TIMEOUT_SECONDS: num('MINIGAME_TIMEOUT_SECONDS', 15),
 };
