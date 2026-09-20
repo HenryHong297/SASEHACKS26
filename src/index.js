@@ -8,6 +8,7 @@ const RoomManager = require('./rooms/RoomManager');
 const BombEngine = require('./rooms/BombEngine');
 const Leaderboard = require('./db/leaderboard');
 const registerSocketHandlers = require('./socket/handlers');
+const { ensureVendorAssets } = require('./vendorAssets');
 
 const app = express();
 app.use(
@@ -29,6 +30,12 @@ registerSocketHandlers(io, roomManager, bombEngine, leaderboard);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
-httpServer.listen(PORT, () => {
-  console.log(`Controlled Charge server listening on http://localhost:${PORT}`);
-});
+ensureVendorAssets()
+  .catch((err) => {
+    console.error('failed to download vendor assets (in-browser focus detector will not load):', err.message);
+  })
+  .finally(() => {
+    httpServer.listen(PORT, () => {
+      console.log(`Controlled Charge server listening on http://localhost:${PORT}`);
+    });
+  });

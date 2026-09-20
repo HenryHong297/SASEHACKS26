@@ -1,4 +1,8 @@
-import { FilesetResolver, FaceLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs';
+// Self-hosted (see src/vendorAssets.js) instead of loaded from jsdelivr -
+// some networks (school/work/hotel wifi) block that CDN outright, which
+// silently dropped players back to the manual focus toggle with no clear
+// reason why. The only thing anyone needs to reach now is this server.
+import { FilesetResolver, FaceLandmarker } from '/vendor/mediapipe/vision_bundle.mjs';
 
 const socket = io({ transports: ['websocket'] });
 
@@ -89,13 +93,10 @@ function headPoseProxy(landmarks) {
 async function initBrowserFocusDetector(videoEl) {
   el('focusToggle').textContent = 'Loading focus detector...';
   try {
-    const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm'
-    );
+    const vision = await FilesetResolver.forVisionTasks('/vendor/mediapipe/wasm');
     faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath:
-          'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',
+        modelAssetPath: '/vendor/mediapipe/face_landmarker.task',
         delegate: 'CPU', // more consistently supported across teammates' different browsers/hardware than GPU
       },
       runningMode: 'VIDEO',

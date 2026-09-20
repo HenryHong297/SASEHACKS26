@@ -17,6 +17,7 @@ ngrok_pid.txt
 ml_out.log
 ml_err.log
 ml_pid.txt
+public/vendor/
 
 # Python (ML-Tracking.py)
 face_landmarker.task

@@ -40,16 +40,18 @@ Crank `unfocusChance` up (like 0.3) to force an explosion quickly for testing �
 
 ## real focus detection (webcam, not the manual toggle)
 
-Focus detection runs **entirely in each player's own browser** — no install, no separate terminal, no per-player setup. The moment you grant camera access, `public/client.js` loads MediaPipe's Face Landmarker (via `@mediapipe/tasks-vision`, straight from a CDN, on-device — no server or network round-trip once it's loaded) and:
+Focus detection runs **entirely in each player's own browser** — no install, no separate terminal, no per-player setup. The moment you grant camera access, `public/client.js` loads MediaPipe's Face Landmarker (via `@mediapipe/tasks-vision`, on-device — no server round-trip once it's loaded) and:
 
 1. Calibrates a "looking at the screen" baseline over the first few seconds (look at your screen normally)
 2. Every frame, checks whether your head position has drifted from that baseline past a tolerance
 3. Only counts it as a distraction after a short grace period, so quick glances away don't hurt you
 4. Calls `socket.emit('focus-update', ...)` whenever your focused/unfocused state actually changes — the exact same event the manual toggle button uses, so the server and `BombEngine` don't know or care where the signal came from
 
-While it's active, the "Your Focus" button becomes a disabled live readout (`FOCUSED (auto-tracked - focus score 92%, 1 distraction)` etc.) instead of something you click, and your own camera box on the game page shows your live video feed.
+While it's active, the "Your Focus" button becomes a disabled live readout (`FOCUSED (auto-tracked - focus score 92%, 1 distraction)` etc.) instead of something you click.
 
-If camera permission is denied, or the detector fails to load (offline, CDN blocked, etc.), it falls back cleanly to the manual toggle button — nothing crashes, you just click it yourself instead.
+If camera permission is denied, or the detector fails to load, it falls back cleanly to the manual toggle button — nothing crashes, you just click it yourself instead.
+
+**The model/runtime files are self-hosted, not loaded from a CDN.** They used to come from `cdn.jsdelivr.net` and `storage.googleapis.com`, but some networks (school/work/hotel wifi) block those outright — which silently dropped anyone on such a network back to the manual toggle with no obvious reason why. Now `src/vendorAssets.js` downloads them once (on first server boot) into `public/vendor/mediapipe/` and serves them from this server instead, so the only thing anyone ever needs to reach is the one url they're already using. Gitignored, ~26MB, downloads automatically - no setup needed, just means the very first `npm start` after a fresh clone takes a few extra seconds.
 
 Notes:
 - Needs a **secure context** — works on `localhost` or any `https://` url (the ngrok tunnel, a real deploy), but browsers block `getUserMedia` entirely on a plain `http://<LAN-IP>:3000` link. See the callout further down.
@@ -136,8 +138,10 @@ src/
     schema.sql
   socket/
     handlers.js           hooks socket events up to the room manager / bomb engine
+  vendorAssets.js         downloads MediaPipe's browser runtime/model once on boot, self-hosted instead of CDN-loaded
 public/
   index.html, client.js   test client - client.js does real in-browser focus detection (MediaPipe), swap the UI for the real one whenever
+  vendor/                 gitignored - downloaded MediaPipe assets land here, served like any other static file
 test/
   simulate.js             fake players for testing without a browser
 ML-Tracking.py            optional standalone Python focus tracker (not wired into the game anymore)
