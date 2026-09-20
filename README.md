@@ -108,4 +108,5 @@ public/
   index.html, client.js   throwaway test client, swap for the real ui
 test/
   simulate.js             fake players for testing without a browser
+ML-Tracking.py            teammate's webcam focus-tracking prototype (Python, standalone for now)
 ```
