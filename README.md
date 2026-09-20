@@ -52,7 +52,19 @@ $env:SESSION_DURATION_SECONDS=15; npm run dev
 
 ## demoing it live
 
-everything runs off your own laptop — no external hosting.
+### option A: deploy it for real (recommended)
+
+Tunneling from a laptop (option B) is flaky — localtunnel's free service drops randomly, sometimes multiple times an hour, and the whole thing dies if your laptop sleeps or loses wifi. Deploy to Render instead for a url that just works:
+
+1. push to GitHub (already done if you're reading this from the repo)
+2. go to https://dashboard.render.com/blueprints and connect this repo — Render reads `render.yaml` in the root and configures the build/start commands and Node version automatically
+3. click deploy, wait ~2-3 min for the first build. you'll get a permanent url like `https://controlled-charge-server.onrender.com`
+
+heads up:
+- free tier disk is wiped on every redeploy/restart, so `leaderboard.db` won't persist across deploys — fine for a demo, just don't expect leaderboard history to survive you pushing a fix mid-event
+- free tier services spin down after 15 min with no traffic and take ~30s to wake back up on the next request — ping the url yourself right before your demo slot so it's already awake
+
+### option B: tunnel from your laptop (quick local testing only)
 
 - **same wifi:** run the server, everyone connects to `http://<your laptop's LAN IP>:3000` (find your IP with `ipconfig`)
 - **outside your wifi** (or venue wifi blocks device-to-device traffic): use a tunnel so people hit a public url that forwards to your laptop:
@@ -65,7 +77,7 @@ everything runs off your own laptop — no external hosting.
 
   it's a free shared proxy with no uptime guarantee, so expect it to drop occasionally — if a link stops responding, kill it and rerun `npm run tunnel` for a fresh one.
 
-either way: this only works while your laptop is on, awake, and the server process is running. closing the lid or losing wifi takes it down for everyone connected.
+  this only works while your laptop is on, awake, and the server process is running. closing the lid or losing wifi takes it down for everyone connected.
 
 ## socket events (the actual api)
 
