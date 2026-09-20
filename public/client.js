@@ -12,7 +12,6 @@ let focused = true;
 let mySocketId = null;
 let localStream = null;
 let localVideoEl = null;
-let lastRoom = null;
 let detectorReady = false;
 
 async function ensureLocalStream() {
@@ -24,7 +23,7 @@ async function ensureLocalStream() {
     localVideoEl.muted = true;
     localVideoEl.playsInline = true;
     localVideoEl.srcObject = localStream;
-    if (lastRoom) renderRoom(lastRoom); // refresh so our camera box picks up the stream
+    attachLocalVideoIfReady(); // picks up the stream without tearing down other players' cards
     initBrowserFocusDetector(localVideoEl); // runs entirely in this browser, no server/python needed
   } catch (e) {
     log(`camera unavailable: ${e.message}`);
@@ -255,32 +254,55 @@ function enterGame(room) {
   renderRoom(room);
 }
 
+// Player cards are created once and updated in place, never torn down and
+// rebuilt - room-state broadcasts fire constantly (every focus change from
+// every player), and repeatedly removing/reinserting a live <video> element
+// on every re-render made browsers stop actually painting it, even though
+// the underlying stream kept feeding frames to the detector just fine.
+const playerCards = new Map(); // playerId -> { card, cam, name }
+
+function attachLocalVideoIfReady() {
+  if (!localVideoEl) return;
+  const entry = playerCards.get(mySocketId);
+  if (entry && !entry.cam.contains(localVideoEl)) {
+    entry.cam.textContent = '';
+    entry.cam.appendChild(localVideoEl);
+  }
+}
+
 function renderRoom(room) {
-  lastRoom = room;
   el('stateLabel').textContent = room.state + (room.isPrivate ? ' (private)' : '');
   const playersDiv = el('players');
-  playersDiv.innerHTML = '';
+  const seen = new Set();
+
   room.players.forEach((p) => {
-    const card = document.createElement('div');
-    card.className = 'playerCard' + (p.focused ? '' : ' unfocused');
-
-    const cam = document.createElement('div');
-    cam.className = 'cameraBox';
-    if (p.id === mySocketId && localVideoEl) {
-      cam.appendChild(localVideoEl); // reuse the same element - re-parenting doesn't interrupt the stream
-    } else {
-      // placeholder until real peer video streaming is wired up
-      cam.textContent = '📷';
+    seen.add(p.id);
+    let entry = playerCards.get(p.id);
+    if (!entry) {
+      const card = document.createElement('div');
+      const cam = document.createElement('div');
+      cam.className = 'cameraBox';
+      cam.textContent = '📷'; // placeholder until real peer video streaming is wired up
+      const name = document.createElement('div');
+      name.className = 'playerName';
+      card.appendChild(cam);
+      card.appendChild(name);
+      playersDiv.appendChild(card);
+      entry = { card, cam, name };
+      playerCards.set(p.id, entry);
     }
-
-    const name = document.createElement('div');
-    name.className = 'playerName';
-    name.textContent = p.name + (p.id === mySocketId ? ' (you)' : '');
-
-    card.appendChild(cam);
-    card.appendChild(name);
-    playersDiv.appendChild(card);
+    entry.card.className = 'playerCard' + (p.focused ? '' : ' unfocused');
+    entry.name.textContent = p.name + (p.id === mySocketId ? ' (you)' : '');
   });
+
+  for (const [id, entry] of playerCards) {
+    if (!seen.has(id)) {
+      entry.card.remove();
+      playerCards.delete(id);
+    }
+  }
+
+  attachLocalVideoIfReady();
 }
 
 socket.on('room-state', renderRoom);
