@@ -80,6 +80,20 @@ class FocusState:
 
 
 class FocusStateHTTPHandler(BaseHTTPRequestHandler):
+    def _cors_headers(self):
+        # Chrome/Edge's Private Network Access policy blocks a public https
+        # page (e.g. the ngrok tunnel url) from reaching into localhost
+        # unless the local server explicitly opts in with this header - on
+        # both the preflight and the real response.
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors_headers()
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.end_headers()
+
     def do_GET(self):
         if self.path != "/focus":
             self.send_response(404)
@@ -88,7 +102,7 @@ class FocusStateHTTPHandler(BaseHTTPRequestHandler):
         body = json.dumps(self.server.focus_state.snapshot()).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._cors_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
