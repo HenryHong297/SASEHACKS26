@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+# SASEHACKS26
+SMH
+=======
 # Controlled Charge — Server
 
 The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. Stay locked in as a team long enough and you defuse it. Runs go on a leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
@@ -114,3 +118,4 @@ public/
 test/
   simulate.js             fake players for testing without a browser
 ```
+>>>>>>> origin/main
