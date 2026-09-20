@@ -2,253 +2,85 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Controlled Charge</title>
+<title>Controlled Charge — Test Client</title>
 <style>
-  :root {
-    --bg: #0d0e16;
-    --card: #191b28;
-    --card-2: #23263a;
-    --text: #f3f4fa;
-    --muted: #8b8fa8;
-    --purple: #8b7cf6;
-    --purple-2: #6a5cf0;
-    --orange: #ffa63d;
-    --red: #ff5470;
-    --green: #2ecc9a;
-  }
-
-  * { box-sizing: border-box; }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
-    max-width: 820px;
-    margin: 0 auto;
-    padding: 32px 20px 60px;
-    background: var(--bg);
-    color: var(--text);
-  }
-
-  h1, h2, h3 { margin: 0 0 4px; }
-  h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 14px; font-weight: 600; }
-
-  header.hero { text-align: center; margin-bottom: 28px; }
-  header.hero .bomb { font-size: 40px; line-height: 1; }
-  header.hero h1 {
-    font-size: 28px;
-    background: linear-gradient(90deg, var(--purple), var(--purple-2));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  header.hero p { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
-
-  .card {
-    background: var(--card);
-    border-radius: 24px;
-    padding: 22px 24px;
-    margin-bottom: 16px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-  }
-
-  .cardRow { display: flex; gap: 16px; flex-wrap: wrap; }
-  .cardRow > .card { flex: 1 1 260px; margin-bottom: 0; }
-  .cardRow + .card { margin-top: 16px; }
-
-  label.field { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 6px; }
-  label.field:first-of-type { margin-top: 0; }
-
-  input[type="text"], input:not([type]) {
-    width: 100%;
-    font-size: 15px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    border: none;
-    background: var(--card-2);
-    color: var(--text);
-    outline: none;
-  }
-  input:focus { box-shadow: 0 0 0 2px var(--purple); }
-  input::placeholder { color: var(--muted); }
-
-  .checkboxRow { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; font-size: 14px; color: var(--muted); }
-  .checkboxRow input { width: auto; accent-color: var(--purple); }
-
-  button {
-    font-size: 15px;
-    padding: 13px 18px;
-    margin-top: 16px;
-    border: none;
-    border-radius: 999px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: transform 0.08s ease, opacity 0.15s ease, filter 0.15s ease;
-  }
-  button:active { transform: scale(0.97); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button:hover:not(:disabled) { filter: brightness(1.08); }
-
-  button.primary { width: 100%; color: #fff; background: linear-gradient(90deg, var(--purple), var(--purple-2)); }
-  button.secondary { background: var(--card-2); color: var(--text); }
-  button.small { margin: 0; padding: 8px 16px; font-size: 13px; }
-
-  .roomRow {
-    display: flex; justify-content: space-between; align-items: center;
-    background: var(--card-2);
-    padding: 12px 16px; border-radius: 16px; margin-bottom: 8px;
-  }
-  .roomRow .meta { font-size: 13px; color: var(--muted); }
-  .roomRow .teamName { font-weight: 600; }
-  #roomListEmpty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
-
-  .gameHeader { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-  .pill { display: inline-block; font-size: 12px; padding: 4px 12px; border-radius: 999px; background: var(--card-2); color: var(--muted); font-weight: 600; }
-  .pill.state-armed { color: var(--orange); background: rgba(255, 166, 61, 0.14); }
-  .pill.state-defused { color: var(--green); background: rgba(46, 204, 154, 0.14); }
-  .pill.state-exploded { color: var(--red); background: rgba(255, 84, 112, 0.14); }
-  .pill.private { color: var(--purple); background: rgba(139, 124, 246, 0.14); margin-left: 6px; }
-
-  .statBig { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .statSub { color: var(--muted); font-size: 13px; margin-top: 4px; }
-
-  #sessionBar { height: 14px; background: var(--card-2); border-radius: 999px; overflow: hidden; margin-top: 14px; }
-  #sessionFill { height: 100%; background: linear-gradient(90deg, var(--purple), var(--purple-2)); width: 0%; transition: width 0.2s linear; border-radius: 999px; }
-
-  .gaugeWrap { position: relative; width: 148px; height: 148px; margin: 4px auto 0; }
-  .gauge { width: 100%; height: 100%; transform: rotate(-90deg); }
-  .gaugeTrack { fill: none; stroke: var(--card-2); stroke-width: 11; }
-  .gaugeProgress { fill: none; stroke: url(#gaugeGradient); stroke-width: 11; stroke-linecap: round; transition: stroke-dashoffset 0.2s linear; }
-  .gaugeCenter { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .gaugeCard { text-align: center; }
-
-  .players { display: flex; gap: 14px; flex-wrap: wrap; }
-  .playerCard {
-    width: 138px; display: flex; flex-direction: column; align-items: center; gap: 8px;
-    background: var(--card-2); padding: 12px; border-radius: 18px;
-    transition: background 0.2s ease, box-shadow 0.2s ease;
-  }
-  .playerCard.unfocused { background: rgba(255, 84, 112, 0.14); box-shadow: 0 0 0 2px var(--red) inset; }
-  .cameraBox { width: 114px; height: 86px; background: #000; border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; color: #454863; font-size: 26px; }
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; background: #111; color: #eee; }
+  input, button { font-size: 16px; padding: 8px; margin: 4px 0; }
+  #bombBar { height: 24px; background: #333; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  #bombFill { height: 100%; background: #e74c3c; width: 100%; transition: width 0.2s linear; }
+  #sessionBar { height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  #sessionFill { height: 100%; background: #2ecc71; width: 0%; transition: width 0.2s linear; }
+  .players { display: flex; gap: 10px; flex-wrap: wrap; }
+  .playerCard { width: 140px; display: flex; flex-direction: column; align-items: center; gap: 6px; background: #222; padding: 8px; border-radius: 8px; }
+  .playerCard.unfocused { background: #7a1f1f; }
+  .cameraBox { width: 124px; height: 92px; background: #000; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; color: #555; font-size: 28px; }
   .cameraBox video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
   .playerName { font-size: 13px; text-align: center; }
-
-  .statRow { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--card-2); border-radius: 14px; font-size: 14px; margin-bottom: 8px; }
-  .statRow:last-child { margin-bottom: 0; }
-  .badge { font-size: 11px; padding: 3px 10px; border-radius: 999px; margin-left: 6px; font-weight: 600; }
-  .badge.mvp { color: var(--green); background: rgba(46, 204, 154, 0.16); }
-  .badge.weak { color: var(--red); background: rgba(255, 84, 112, 0.16); }
-
-  #leaderboard { list-style: none; padding: 0; margin: 0; }
-  #leaderboard li { background: var(--card-2); padding: 12px 16px; border-radius: 14px; margin-bottom: 8px; font-size: 14px; }
-  #leaderboard li:last-child { margin-bottom: 0; }
-
-  details.logBox { margin-top: 24px; color: var(--muted); }
-  details.logBox summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
-  #log { font-size: 12px; color: var(--muted); white-space: pre-wrap; max-height: 150px; overflow-y: auto; margin-top: 8px; }
-
+  #roundSummary { background: #222; padding: 16px; border-radius: 8px; margin-top: 12px; }
+  .statRow { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #333; }
+  .badge.mvp { color: #2ecc71; font-weight: bold; }
+  .badge.weak { color: #e74c3c; font-weight: bold; }
+  #sessionTimer { font-size: 32px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  #bufferTimer { font-size: 16px; color: #e74c3c; }
+  #log { font-size: 12px; color: #888; white-space: pre-wrap; max-height: 150px; overflow-y: auto; }
   .hidden { display: none; }
+  #roomList { display: flex; flex-direction: column; gap: 6px; }
+  .roomRow { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 8px 12px; border-radius: 6px; }
+  .roomRow button { margin: 0; }
+  #roomListEmpty { color: #888; font-size: 14px; }
 </style>
 </head>
 <body>
-  <header class="hero">
-    <div class="bomb">💣</div>
-    <h1>Controlled Charge</h1>
-    <p>Stay focused as a team, or watch it blow up.</p>
-  </header>
+  <h1>Controlled Charge — Test Client</h1>
 
   <div id="lobby">
-    <div class="cardRow">
-      <div class="card">
-        <h3>Create a Team</h3>
-        <label class="field" for="teamName">Team name</label>
-        <input id="teamName" placeholder="e.g. Study Squad" />
-        <label class="field" for="createPlayerName">Your name</label>
-        <input id="createPlayerName" placeholder="Your name" />
-        <label class="checkboxRow"><input type="checkbox" id="isPrivateCheckbox" /> 🔒 Private — only joinable by code, hidden from the public list</label>
-        <button class="primary" id="createBtn">Create Bomb Defusal Team</button>
-      </div>
-
-      <div class="card">
-        <h3>Join a Team</h3>
-        <label class="field" for="roomCode">Team code</label>
-        <input id="roomCode" placeholder="Team code" style="text-transform:uppercase" />
-        <label class="field" for="playerName">Your name</label>
-        <input id="playerName" placeholder="Your name" />
-        <button class="secondary" style="width:100%" id="joinBtn">Join Bomb Defusal Team</button>
-      </div>
+    <div>
+      <input id="teamName" placeholder="Team name" />
+      <input id="createPlayerName" placeholder="Your name" />
+      <label><input type="checkbox" id="isPrivateCheckbox" /> Private (only joinable by code)</label>
+      <button id="createBtn">Create Bomb Defusal Team</button>
+    </div>
+    <div>
+      <input id="roomCode" placeholder="Team code" style="text-transform:uppercase" />
+      <input id="playerName" placeholder="Your name" />
+      <button id="joinBtn">Join Bomb Defusal Team</button>
     </div>
 
-    <div class="card">
-      <h3>Active Public Teams</h3>
-      <div id="roomList"></div>
-      <div id="roomListEmpty">no open bomb defusal teams right now — create one!</div>
-    </div>
+    <h3>Active Bomb Defusal Teams</h3>
+    <p style="color:#888; font-size:14px; margin:0 0 8px;">uses the name typed above under "Team code"</p>
+    <div id="roomList"></div>
+    <div id="roomListEmpty">no open bomb defusal teams right now — create one!</div>
   </div>
 
   <div id="game" class="hidden">
-    <div class="card">
-      <div class="gameHeader">
-        <div>
-          <h2><span id="roomCodeLabel"></span></h2>
-          <span class="pill" id="stateLabel"></span>
-          <span class="pill private hidden" id="privatePill">🔒 private</span>
-        </div>
-        <button class="secondary small" id="startBtn">Start Session</button>
-      </div>
-    </div>
+    <h2>Bomb Defusal Team: <span id="roomCodeLabel"></span> — <span id="stateLabel"></span></h2>
+    <button id="startBtn">Start Session</button>
 
-    <div class="cardRow">
-      <div class="card">
-        <h3>Study Timer</h3>
-        <div class="statBig" id="sessionTimer">00:00 / 00:00</div>
-        <div id="sessionBar"><div id="sessionFill"></div></div>
-      </div>
-      <div class="card gaugeCard">
-        <h3>Bomb Danger Buffer</h3>
-        <div class="gaugeWrap">
-          <svg class="gauge" viewBox="0 0 120 120">
-            <defs>
-              <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#ffa63d" />
-                <stop offset="100%" stop-color="#ff5470" />
-              </linearGradient>
-            </defs>
-            <circle class="gaugeTrack" cx="60" cy="60" r="52" />
-            <circle class="gaugeProgress" id="bombGauge" cx="60" cy="60" r="52" />
-          </svg>
-          <div class="gaugeCenter">
-            <div class="statBig" id="bufferTimer">—</div>
-            <div class="statSub" id="bufferSub"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <h3>Study timer</h3>
+    <div id="sessionTimer">00:00 / 00:00</div>
+    <div id="sessionBar"><div id="sessionFill"></div></div>
 
-    <div class="card">
-      <h3>Players</h3>
-      <div class="players" id="players"></div>
-    </div>
+    <h3>Bomb danger buffer</h3>
+    <div id="bombBar"><div id="bombFill"></div></div>
+    <div id="bufferTimer"></div>
 
-    <div class="card">
-      <h3>Your Focus</h3>
-      <button class="secondary" id="focusToggle">I'm FOCUSED (click to look away)</button>
-    </div>
+    <h3>Players</h3>
+    <div class="players" id="players"></div>
 
-    <div id="roundSummary" class="card hidden">
+    <h3>Your focus</h3>
+    <button id="focusToggle">I'm FOCUSED (click to look away)</button>
+
+    <div id="roundSummary" class="hidden">
       <h3>Round Summary</h3>
       <div id="statsList"></div>
     </div>
 
-    <div class="card">
-      <h3>Leaderboard</h3>
-      <ol id="leaderboard" style="padding-left:0; list-style:none; margin:0;"></ol>
-    </div>
+    <h3>Leaderboard</h3>
+    <ol id="leaderboard"></ol>
   </div>
 
-  <details class="logBox">
-    <summary>Debug Log</summary>
-    <div id="log"></div>
-  </details>
+  <h3>Log</h3>
+  <div id="log"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>

@@ -1,4 +1,3 @@
-
 const socket = io({ transports: ['websocket'] });
 
 const el = (id) => document.getElementById(id);
@@ -77,9 +76,8 @@ function renderRoomList({ rooms }) {
     const row = document.createElement('div');
     row.className = 'roomRow';
     const label = document.createElement('span');
-    label.innerHTML = `<span class="teamName">${r.teamName}</span> <span class="meta">(${r.code}) — ${r.playerCount}/${r.maxPlayers} players</span>`;
+    label.textContent = `${r.teamName} (${r.code}) — ${r.playerCount}/${r.maxPlayers} players`;
     const joinBtn = document.createElement('button');
-    joinBtn.className = 'secondary small';
     joinBtn.textContent = 'Join';
     joinBtn.disabled = r.playerCount >= r.maxPlayers;
     joinBtn.onclick = () => joinRoomByCode(r.code);
@@ -102,9 +100,7 @@ function enterGame(room) {
 
 function renderRoom(room) {
   lastRoom = room;
-  el('stateLabel').textContent = room.state;
-  el('stateLabel').className = `pill state-${room.state}`;
-  el('privatePill').classList.toggle('hidden', !room.isPrivate);
+  el('stateLabel').textContent = room.state + (room.isPrivate ? ' (private)' : '');
   const playersDiv = el('players');
   playersDiv.innerHTML = '';
   room.players.forEach((p) => {
@@ -143,18 +139,12 @@ const formatClock = (totalSeconds) => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
-const GAUGE_RADIUS = 52;
-const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
-el('bombGauge').style.strokeDasharray = `${GAUGE_CIRCUMFERENCE}`;
-
 socket.on('bomb-tick', ({ bombBuffer, bombBufferMax, sessionElapsed, sessionDuration, unfocusedCount }) => {
-  const ratio = bombBuffer / bombBufferMax;
-  el('bombGauge').style.strokeDashoffset = `${GAUGE_CIRCUMFERENCE * (1 - ratio)}`;
+  el('bombFill').style.width = `${(bombBuffer / bombBufferMax) * 100}%`;
   el('sessionFill').style.width = `${(sessionElapsed / sessionDuration) * 100}%`;
   el('sessionTimer').textContent = `${formatClock(sessionElapsed)} / ${formatClock(sessionDuration)}`;
-  el('bufferTimer').textContent = `${bombBuffer}s`;
-  el('bufferSub').textContent =
-    unfocusedCount > 0 ? `draining fast — ${unfocusedCount} unfocused` : 'holding steady';
+  el('bufferTimer').textContent =
+    unfocusedCount > 0 ? `${bombBuffer}s until it blows (${unfocusedCount} unfocused)` : `${bombBuffer}s until it blows`;
 });
 
 function renderRoundSummary({ players, mvp, weakLink }) {
