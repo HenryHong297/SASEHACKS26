@@ -2,7 +2,7 @@
 
 The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. There's no time limit — the session just runs forever, and the goal is to survive as long as possible before someone's unfocus streak blows it up. Longest survival time goes on the leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
 
-This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic before the real webcam focus-detection UI exists.
+This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic, plus a real webcam focus tracker (`ML-Tracking.py`) that plugs into it — see "real focus detection" below.
 
 ## what you need
 
@@ -22,7 +22,7 @@ Open that url in 2+ browser tabs:
 
 1. tab 1 hits "Create Bomb Defusal Team"
 2. everyone else sees it show up under "Active Bomb Defusal Teams" and clicks "Join" (or types the team code manually)
-3. each tab will prompt for camera access — that's the (placeholder) camera view per player, allow it
+3. each tab will prompt for camera access (unless you're running the real tracker — see below), allow it
 4. hit "Start Session" once you've got 2+ people in — it runs indefinitely, no timer to hit
 5. click "I'm FOCUSED" in a tab to fake looking away — watch the bomb bar drain live in every tab at once, faster the more tabs are "unfocused" simultaneously
 6. it only ends when it explodes — a round summary shows everyone's total unfocused time, tagging the MVP (least unfocused) and Weak Link (most unfocused), and the leaderboard updates with how long you survived
@@ -37,6 +37,23 @@ npm run simulate -- --players=4 --unfocusChance=0.05
 ```
 
 Crank `unfocusChance` up (like 0.3) to force an explosion quickly for testing — there's no time limit, so left at 0 it'll just run forever.
+
+## real focus detection (webcam, not the manual toggle)
+
+`ML-Tracking.py` is a real webcam focus tracker — MediaPipe Face Mesh reads your head pose, calibrates a "looking at the screen" baseline, and flags you as unfocused if you look away past a grace period. It plugs into the game with **zero server changes**: it serves its live reading on a local HTTP endpoint, and `public/client.js` polls that endpoint and forwards it through the exact same `focus-update` event the manual toggle button uses.
+
+```powershell
+pip install -r requirements.txt
+python ML-Tracking.py
+```
+
+Then open the game in your browser as usual (`http://localhost:3000` or the tunnel url) and join/create a team. On load, the page checks `http://localhost:8765/focus` for about a second — if `ML-Tracking.py` is already running, it skips asking for camera permission (avoids two things fighting over your one webcam) and the "Your Focus" button becomes a live readout instead of something you click. If it's not running yet, everything falls back to the manual toggle + browser camera preview exactly like before, and it'll pick up the tracker automatically if you start it a bit later (checked every second).
+
+Notes:
+- Start `ML-Tracking.py` **before** opening/joining the game in the browser to avoid a brief moment where both try to grab the camera.
+- The first few seconds are calibration ("look at your screen normally") — readings during that window aren't sent to the game.
+- `--camera N` picks a different webcam if you have more than one, `--yaw-tol`/`--pitch-tol` loosen or tighten how far you can turn your head before it counts as looking away. Run `python ML-Tracking.py --help` for the full list.
+- This only tracks *your own* focus locally — it doesn't send video anywhere, just a `{focused, focusScore, distractions, calibrating}` reading to your own browser tab on the same machine.
 
 ## demoing it live
 
@@ -108,5 +125,6 @@ public/
   index.html, client.js   throwaway test client, swap for the real ui
 test/
   simulate.js             fake players for testing without a browser
-ML-Tracking.py            teammate's webcam focus-tracking prototype (Python, standalone for now)
+ML-Tracking.py            real webcam focus tracker (Python) - serves live readings on :8765/focus
+requirements.txt          pip deps for ML-Tracking.py
 ```

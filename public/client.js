@@ -10,6 +10,7 @@ let focused = true;
 let mySocketId = null;
 let localStream = null;
 let lastRoom = null;
+let trackerAvailable = false;
 
 async function ensureLocalStream() {
   if (localStream) return localStream;
@@ -21,6 +22,56 @@ async function ensureLocalStream() {
   }
   return localStream;
 }
+
+// picks up real focus/unfocus readings from a locally-running ML-Tracking.py
+// (see that file's FocusStateHTTPHandler) and forwards them through the same
+// focus-update event the manual toggle uses. falls back to the manual toggle
+// + browser camera preview if the tracker isn't running.
+const TRACKER_URL = 'http://localhost:8765/focus';
+
+async function pollTracker() {
+  try {
+    const res = await fetch(TRACKER_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const data = await res.json();
+    onTrackerReading(data);
+  } catch (e) {
+    if (trackerAvailable) {
+      trackerAvailable = false;
+      log('lost connection to local ML-Tracking.py, falling back to manual toggle');
+      el('focusToggle').disabled = false;
+      el('focusToggle').textContent = focused
+        ? "I'm FOCUSED (click to look away)"
+        : "LOOKING AWAY (click to refocus)";
+    }
+  }
+}
+
+function onTrackerReading(data) {
+  if (!trackerAvailable) {
+    trackerAvailable = true;
+    log('connected to local ML-Tracking.py - focus is now tracked automatically');
+    el('focusToggle').disabled = true;
+    if (localStream) {
+      // avoid two processes fighting over the same webcam
+      localStream.getTracks().forEach((t) => t.stop());
+      localStream = null;
+      if (lastRoom) renderRoom(lastRoom);
+    }
+  }
+  el('focusToggle').textContent = data.calibrating
+    ? 'ML-Tracking.py is calibrating...'
+    : `ML-Tracking.py: ${data.focused ? 'FOCUSED' : 'LOOKING AWAY'} (focus score ${Math.round((data.focusScore || 0) * 100)}%)`;
+
+  if (data.calibrating) return; // don't act on readings taken before the baseline is set
+  const newFocused = !!data.focused;
+  if (newFocused !== focused) {
+    focused = newFocused;
+    socket.emit('focus-update', { focused });
+  }
+}
+
+setInterval(pollTracker, 1000);
 
 socket.on('connect', () => {
   mySocketId = socket.id;
@@ -89,12 +140,13 @@ function renderRoomList({ rooms }) {
 
 socket.on('rooms-list', renderRoomList);
 
-function enterGame(room) {
+async function enterGame(room) {
   el('lobby').classList.add('hidden');
   el('game').classList.remove('hidden');
   el('roomCodeLabel').textContent = room.code;
   el('roundSummary').classList.add('hidden');
-  ensureLocalStream();
+  await pollTracker(); // quick check: is ML-Tracking.py already running?
+  if (!trackerAvailable) ensureLocalStream();
   renderRoom(room);
 }
 
@@ -116,6 +168,8 @@ function renderRoom(room) {
       video.playsInline = true;
       video.srcObject = localStream;
       cam.appendChild(video);
+    } else if (p.id === mySocketId && trackerAvailable) {
+      cam.textContent = '🎯'; // tracked by local ML-Tracking.py instead of a browser feed
     } else {
       // placeholder until real peer video streaming is wired up
       cam.textContent = '📷';

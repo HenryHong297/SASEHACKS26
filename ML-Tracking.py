@@ -5,7 +5,7 @@ Uses MediaPipe Face Mesh (pretrained neural net) to find face landmarks, then
 estimates head yaw/pitch. "Focused" = face visible and head pointed at the screen.
 
 Setup:  pip install mediapipe opencv-python numpy
-Run:    python focus_tracker.py
+Run:    python ML-Tracking.py
 Keys:   'r' = recalibrate, 'q' = quit
 
 How it works:
@@ -18,14 +18,66 @@ How it works:
      were not in a distraction.
   5. Flags fire when you've been away >= --away-flag seconds in a row, or when
      your window focus score drops below --min-focus.
+
+Integration with the Controlled Charge web game:
+  This script also serves its live focus state on a local HTTP endpoint
+  (http://localhost:<port>/focus) so the browser test client can poll it and
+  forward real focus/unfocus events into the game over the same socket it
+  already uses for the manual toggle - no server changes needed. See
+  FocusStateServer below and public/client.js's pollLocalTracker().
 """
 
 import argparse
+import json
+import threading
 import time
 from collections import deque
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cv2
 import numpy as np
+
+
+class FocusState:
+    """Thread-safe holder for the latest focus reading, shared with the HTTP server."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._data = {"focused": True, "focusScore": 1.0, "distractions": 0, "calibrating": True}
+
+    def update(self, **kwargs):
+        with self._lock:
+            self._data.update(kwargs)
+
+    def snapshot(self):
+        with self._lock:
+            return dict(self._data)
+
+
+class FocusStateHTTPHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path != "/focus":
+            self.send_response(404)
+            self.end_headers()
+            return
+        body = json.dumps(self.server.focus_state.snapshot()).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass  # keep the console clean, the cv2 overlay already shows status
+
+
+def start_focus_state_server(focus_state, port):
+    server = ThreadingHTTPServer(("127.0.0.1", port), FocusStateHTTPHandler)
+    server.focus_state = focus_state
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 # MediaPipe Face Mesh landmark ids: nose tip, chin, eye outer corners, mouth corners
 LM_IDS = [1, 152, 33, 263, 61, 291]
@@ -78,7 +130,12 @@ def main():
     ap.add_argument("--pitch-tol", type=float, default=20, help="degrees up/down from baseline")
     ap.add_argument("--calib", type=float, default=3, help="calibration seconds")
     ap.add_argument("--flag-cooldown", type=float, default=30)
+    ap.add_argument("--port", type=int, default=8765, help="local HTTP port that serves /focus for the web game")
     args = ap.parse_args()
+
+    focus_state = FocusState()
+    start_focus_state_server(focus_state, args.port)
+    print(f"serving live focus state on http://localhost:{args.port}/focus")
 
     face_mesh = mp.solutions.face_mesh.FaceMesh(
         max_num_faces=1, min_detection_confidence=0.5, min_tracking_confidence=0.5)
@@ -118,6 +175,7 @@ def main():
                 calib["pitch"].append(pose[1])
             cv2.putText(frame, f"CALIBRATING: look at your screen ({max(0, args.calib - elapsed):.0f}s)",
                         (10, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+            focus_state.update(calibrating=True)
             if elapsed >= args.calib and len(calib["yaw"]) > 10:
                 calib["base"] = (float(np.median(calib["yaw"])), float(np.median(calib["pitch"])))
                 session_start = now
@@ -158,6 +216,7 @@ def main():
         data_secs = samples[-1][0] - samples[0][0]
         total_frames += 1
         focused_frames += focused
+        focus_state.update(focused=focused, focusScore=focus_score, distractions=distractions, calibrating=False)
 
         # ---- flags ----
         if now - last_flag > args.flag_cooldown:
