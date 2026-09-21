@@ -1,4 +1,10 @@
-const { BUFFER_MAX_SECONDS, BUFFER_DRAIN_PER_TICK, BUFFER_REGEN_PER_TICK, TICK_INTERVAL_MS } = require('../config');
+const {
+  BUFFER_MAX_SECONDS,
+  BUFFER_DRAIN_PER_TICK,
+  BUFFER_REGEN_PER_TICK,
+  BUFFER_DRAIN_ESCALATION_MAX,
+  TICK_INTERVAL_MS,
+} = require('../config');
 
 class BombEngine {
   constructor(io, roomManager, leaderboard) {
@@ -44,8 +50,13 @@ class BombEngine {
     });
 
     if (unfocusedCount > 0) {
-      // more people looking away drains the buffer proportionally faster
-      room.bombBuffer = Math.max(0, room.bombBuffer - BUFFER_DRAIN_PER_TICK * unfocusedCount);
+      // more people looking away drains the buffer proportionally faster, and
+      // the drain itself accelerates the lower the buffer already is - the
+      // closer to exploding, the faster it goes, instead of a flat rate the
+      // whole way down.
+      const dangerFraction = 1 - room.bombBuffer / room.bombBufferMax; // 0 = full, 1 = empty
+      const escalation = 1 + dangerFraction * (BUFFER_DRAIN_ESCALATION_MAX - 1);
+      room.bombBuffer = Math.max(0, room.bombBuffer - BUFFER_DRAIN_PER_TICK * unfocusedCount * escalation);
     } else {
       room.bombBuffer = Math.min(room.bombBufferMax, room.bombBuffer + BUFFER_REGEN_PER_TICK);
     }
