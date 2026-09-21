@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameSocket } from './useGameSocket'
 import { useFocusDetector, type DetectorState } from './useFocusDetector'
-import { isMuted, playAlert, playArm, playClick, playExplosion, setMuted } from './sounds'
+import { isMuted, playArm, playClick, playExplosion, setMuted, startDangerLoop, stopDangerLoop } from './sounds'
 import type { BombTick, LeaderboardEntry, Room, RoomListEntry, RoundSummary } from './types'
 
 type RoomWithExtras = Room & { bombTick: BombTick | null; roundSummary: RoundSummary | null }
@@ -561,12 +561,12 @@ function SessionView({
   const isExploded = room.state === 'exploded'
   const progress = isArmed && bombTick && bombTick.bombBufferMax > 0 ? 1 - bombTick.bombBuffer / bombTick.bombBufferMax : 0
 
-  const wasAnyUnfocused = useRef(false)
+  const dangerFlash = isArmed && (bombTick?.anyUnfocused ?? false)
   useEffect(() => {
-    const anyUnfocused = bombTick?.anyUnfocused ?? false
-    if (anyUnfocused && !wasAnyUnfocused.current) playAlert()
-    wasAnyUnfocused.current = anyUnfocused
-  }, [bombTick?.anyUnfocused])
+    if (dangerFlash) startDangerLoop()
+    else stopDangerLoop()
+    return () => stopDangerLoop()
+  }, [dangerFlash])
 
   const hasPlayedExplosion = useRef(false)
   useEffect(() => {
@@ -585,8 +585,6 @@ function SessionView({
     setStarting(false)
     if (res.error) setStartError(res.error)
   }
-
-  const dangerFlash = isArmed && (bombTick?.anyUnfocused ?? false)
 
   return (
     <div className="min-h-screen flex flex-col relative" style={{ background: 'var(--background)', fontFamily: 'var(--font-sans)' }}>

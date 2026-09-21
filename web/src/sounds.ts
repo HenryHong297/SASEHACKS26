@@ -24,6 +24,7 @@ export function setMuted(next: boolean) {
   } catch {
     // ignore - private browsing / storage disabled
   }
+  if (next) stopDangerLoop()
 }
 
 function getCtx(): AudioContext | null {
@@ -72,39 +73,126 @@ export function playArm() {
   setTimeout(() => tone(760, 150, { type: 'sine', gain: 0.18 }), 110)
 }
 
-/** Short warning blip when someone in the room looks away. */
-export function playAlert() {
-  tone(260, 140, { type: 'sawtooth', gain: 0.1 })
+// ── Danger loop (continuous alarm while the screen is flashing red) ──────────
+// A single long-lived oscillator wobbled by an LFO, instead of retriggering a
+// one-shot blip - gives a real siren/klaxon sense of urgency that runs for as
+// long as someone's unfocused, and stops the instant they're not.
+let dangerOsc: OscillatorNode | null = null
+let dangerLfo: OscillatorNode | null = null
+let dangerGain: GainNode | null = null
+
+export function startDangerLoop() {
+  if (muted || dangerOsc) return
+  const audioCtx = getCtx()
+  if (!audioCtx) return
+
+  const osc = audioCtx.createOscillator()
+  osc.type = 'square'
+  osc.frequency.setValueAtTime(480, audioCtx.currentTime)
+
+  const lfo = audioCtx.createOscillator()
+  lfo.type = 'sine'
+  lfo.frequency.setValueAtTime(1.3, audioCtx.currentTime) // wobble rate - roughly matches the CSS flash cadence
+
+  const lfoGain = audioCtx.createGain()
+  lfoGain.gain.setValueAtTime(200, audioCtx.currentTime) // wobble depth in Hz
+  lfo.connect(lfoGain)
+  lfoGain.connect(osc.frequency)
+
+  const gainNode = audioCtx.createGain()
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime)
+  gainNode.gain.linearRampToValueAtTime(0.07, audioCtx.currentTime + 0.05)
+
+  osc.connect(gainNode)
+  gainNode.connect(audioCtx.destination)
+  osc.start()
+  lfo.start()
+
+  dangerOsc = osc
+  dangerLfo = lfo
+  dangerGain = gainNode
 }
 
-/** Decaying filtered noise burst for the bomb going off. */
+export function stopDangerLoop() {
+  if (!dangerOsc || !dangerGain) return
+  const audioCtx = getCtx()
+  const osc = dangerOsc
+  const lfo = dangerLfo
+  const gainNode = dangerGain
+  dangerOsc = null
+  dangerLfo = null
+  dangerGain = null
+
+  if (audioCtx) {
+    const now = audioCtx.currentTime
+    gainNode.gain.cancelScheduledValues(now)
+    gainNode.gain.setValueAtTime(gainNode.gain.value, now)
+    gainNode.gain.linearRampToValueAtTime(0, now + 0.08)
+  }
+  setTimeout(() => {
+    try {
+      osc.stop()
+      lfo?.stop()
+    } catch {
+      // already stopped
+    }
+  }, 120)
+}
+
+/** Layered retro arcade-style "boom" for the bomb going off - a sharp crack, a
+ * descending square-wave sweep, and a filtered noise crash, all decaying together. */
 export function playExplosion() {
   if (muted) return
   const audioCtx = getCtx()
   if (!audioCtx) return
 
-  const duration = 0.7
+  const now = audioCtx.currentTime
+  const duration = 0.9
+
+  // low retro square-wave sweep - the classic 8-bit "doom" descent
+  const boom = audioCtx.createOscillator()
+  boom.type = 'square'
+  boom.frequency.setValueAtTime(220, now)
+  boom.frequency.exponentialRampToValueAtTime(28, now + duration)
+  const boomGain = audioCtx.createGain()
+  boomGain.gain.setValueAtTime(0.4, now)
+  boomGain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+  boom.connect(boomGain)
+  boomGain.connect(audioCtx.destination)
+  boom.start(now)
+  boom.stop(now + duration + 0.05)
+
+  // filtered noise for the crash texture
   const bufferSize = Math.floor(audioCtx.sampleRate * duration)
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate)
   const data = buffer.getChannelData(0)
   for (let i = 0; i < bufferSize; i++) {
     data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize)
   }
-
   const noise = audioCtx.createBufferSource()
   noise.buffer = buffer
-
   const filter = audioCtx.createBiquadFilter()
   filter.type = 'lowpass'
-  filter.frequency.setValueAtTime(1400, audioCtx.currentTime)
-  filter.frequency.exponentialRampToValueAtTime(70, audioCtx.currentTime + duration)
-
-  const gainNode = audioCtx.createGain()
-  gainNode.gain.setValueAtTime(0.55, audioCtx.currentTime)
-  gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration)
-
+  filter.frequency.setValueAtTime(2200, now)
+  filter.frequency.exponentialRampToValueAtTime(60, now + duration)
+  const noiseGain = audioCtx.createGain()
+  noiseGain.gain.setValueAtTime(0.5, now)
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration)
   noise.connect(filter)
-  filter.connect(gainNode)
-  gainNode.connect(audioCtx.destination)
-  noise.start()
+  filter.connect(noiseGain)
+  noiseGain.connect(audioCtx.destination)
+  noise.start(now)
+
+  // sharp initial crack for impact
+  const crack = audioCtx.createOscillator()
+  crack.type = 'square'
+  crack.frequency.setValueAtTime(1400, now)
+  crack.frequency.exponentialRampToValueAtTime(200, now + 0.08)
+  const crackGain = audioCtx.createGain()
+  crackGain.gain.setValueAtTime(0.25, now)
+  crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09)
+  crack.connect(crackGain)
+  crackGain.connect(audioCtx.destination)
+  crack.start(now)
+  crack.stop(now + 0.1)
 }
