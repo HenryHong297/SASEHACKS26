@@ -1,5 +1,7 @@
 # Node / server
 node_modules/
+web/node_modules/
+web/dist/
 leaderboard.db
 leaderboard.db-wal
 leaderboard.db-shm

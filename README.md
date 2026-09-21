@@ -2,7 +2,7 @@
 
 The idea: 2-5 people join a team, there's a shared "bomb" in the middle, and it only starts getting dangerous if someone stops paying attention (looks down or away from their screen) — the more people looking away at once, the faster it drains. There's no time limit — the session just runs forever, and the goal is to survive as long as possible before someone's unfocus streak blows it up. Longest survival time goes on the leaderboard. Teams can be public (shown on the home page, click to join) or private (only joinable if you have the code).
 
-This repo is just the server side — Node + Socket.IO. There's also a barebones test page in here so you can mess with the game logic. Focus detection is real, not a placeholder: it runs on-device in each player's own browser via MediaPipe — see "real focus detection" below. Other players show up as a name + focused/unfocused highlight; you only see your own camera, not theirs (real peer-to-peer video was tried and pulled back out — see git history if you want to revisit it).
+This repo has two parts: the Node + Socket.IO server (the game itself lives here), and `web/` — a React/Vite/Tailwind app that's the actual UI players use. There's also a barebones vanilla-JS test page (`public/legacy-test/`) left over from before the React UI existed, handy for quick backend debugging without a build step. Focus detection is real, not a placeholder: it runs on-device in each player's own browser via MediaPipe — see "real focus detection" below. Other players show up as a name + focused/unfocused highlight; you only see your own camera, not theirs (real peer-to-peer video was tried and pulled back out — see git history if you want to revisit it).
 
 ## what you need
 
@@ -14,17 +14,20 @@ This repo is just the server side — Node + Socket.IO. There's also a barebones
 git clone https://github.com/mdang0/SASEHACKS26.git
 cd SASEHACKS26
 npm install
-copy .env.example .env   # optional, defaults work fine
-npm run dev                # http://localhost:3000, restarts itself when you save a file
+npm run build               # builds web/ (the React UI) into web/dist, which the server serves
+copy .env.example .env      # optional, defaults work fine
+npm run dev                 # http://localhost:3000, restarts itself when you save a server file
 ```
+
+`npm run build` only needs to be re-run when you change something under `web/`. If you're actively working on the UI, `npm --prefix web run dev` gives you Vite's hot-reload dev server on `:5173` instead (it proxies `/socket.io`, `/vendor`, and `/health` to the real server on `:3000` — run both at once).
 
 Open that url in 2+ browser tabs:
 
-1. tab 1 hits "Create Bomb Defusal Team"
+1. tab 1 hits "Initialize Team"
 2. everyone else sees it show up under "Active Bomb Defusal Teams" and clicks "Join" (or types the team code manually)
 3. each tab will prompt for camera access — allow it. This isn't just a preview: your browser starts genuinely detecting whether you're looking at the screen (see "real focus detection" below), no extra setup needed
-4. hit "Start Session" once you've got 2+ people in — it runs indefinitely, no timer to hit
-5. look away from your screen for a few seconds in one tab — watch the bomb bar drain live in every tab at once, faster the more people are "unfocused" simultaneously. (If camera access was denied or the detector failed to load, that tab falls back to a manual "I'm FOCUSED" toggle button instead.)
+4. hit "Arm The Bomb" once you've got 2+ people in — it runs indefinitely, no timer to hit
+5. look away from your screen for a few seconds in one tab — watch the ring fill live in every tab at once, faster the more people are "unfocused" simultaneously. (If camera access was denied or the detector failed to load, that tab falls back to a manual "I'm FOCUSED" toggle button instead.)
 6. it only ends when it explodes — a round summary shows everyone's total unfocused time, tagging the MVP (least unfocused) and Weak Link (most unfocused), and the leaderboard updates with how long you survived
 
 ### testing without opening a browser
@@ -40,7 +43,7 @@ Crank `unfocusChance` up (like 0.3) to force an explosion quickly for testing �
 
 ## real focus detection (webcam, not the manual toggle)
 
-Focus detection runs **entirely in each player's own browser** — no install, no separate terminal, no per-player setup. The moment you grant camera access, `public/client.js` loads MediaPipe's Face Landmarker (via `@mediapipe/tasks-vision`, on-device — no server round-trip once it's loaded) and:
+Focus detection runs **entirely in each player's own browser** — no install, no separate terminal, no per-player setup. The moment you grant camera access, `web/src/useFocusDetector.ts` (the same algorithm also lives in `public/legacy-test/client.js` for the vanilla test page) loads MediaPipe's Face Landmarker (via `@mediapipe/tasks-vision`, on-device — no server round-trip once it's loaded) and:
 
 1. Calibrates a "looking at the screen" baseline over the first few seconds (look at your screen normally)
 2. Every frame, checks whether your head position has drifted from that baseline past a tolerance
@@ -56,7 +59,7 @@ If camera permission is denied, the camera hardware fails to open (`NotReadableE
 Notes:
 - Needs a **secure context** — works on `localhost` or any `https://` url (the ngrok tunnel, a real deploy), but browsers block `getUserMedia` entirely on a plain `http://<LAN-IP>:3000` link. See the callout further down.
 - The head-direction math is a simple, scale-invariant proxy from raw landmark positions (nose position relative to the eye midpoint, normalized by interocular distance), not real yaw/pitch degrees — deliberately avoids depending on the exact matrix layout MediaPipe's transformation-matrix output uses, which isn't documented and wasn't practical to verify without a browser in the loop while building this. It's calibrated per-person per-session, so the units don't need to mean anything universal, just be consistent.
-- Tunable constants are in `public/client.js`: `CALIB_SECONDS`, `GRACE_SECONDS`, `YAW_TOL`/`PITCH_TOL`, `WINDOW_SECONDS`.
+- Tunable constants are in `web/src/useFocusDetector.ts`: `CALIB_SECONDS`, `GRACE_SECONDS`, `YAW_TOL`/`PITCH_TOL`, `WINDOW_SECONDS`.
 - This only runs locally in your browser — no video or focus data is ever sent anywhere except the plain `{focused: true/false}` signal to the game server, same as the manual toggle always did.
 
 ### ML-Tracking.py (optional standalone alternative)
@@ -128,7 +131,7 @@ server broadcasts:
 
 ```
 src/
-  index.js              express + socket.io setup
+  index.js              express + socket.io setup, serves web/dist and public/
   config.js             all the tunable numbers (override via env vars)
   rooms/
     RoomManager.js       who's in what room
@@ -139,8 +142,14 @@ src/
   socket/
     handlers.js           hooks socket events up to the room manager / bomb engine
   vendorAssets.js         downloads MediaPipe's browser runtime/model once on boot, self-hosted instead of CDN-loaded
+web/                    the real UI - React + Vite + Tailwind, `npm run build` outputs to web/dist
+  src/
+    App.tsx               all the screens (home, session, round summary, leaderboard)
+    useGameSocket.ts       socket.io client wiring - rooms, bomb-tick, round summaries, leaderboard
+    useFocusDetector.ts    the same MediaPipe calibration/detection algorithm as public/legacy-test/client.js, ported to a hook
+    socket.ts, types.ts    shared socket connection + event payload types
 public/
-  index.html, client.js   test client - client.js does real in-browser focus detection (MediaPipe), swap the UI for the real one whenever
+  legacy-test/            old vanilla-JS test client (index.html + client.js), kept for quick backend debugging without a build step
   vendor/                 gitignored - downloaded MediaPipe assets land here, served like any other static file
 test/
   simulate.js             fake players for testing without a browser

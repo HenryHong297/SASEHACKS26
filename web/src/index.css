@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+:root {
+  --background: #111110;
+  --foreground: #d4cfc8;
+  --card: #181715;
+  --card-foreground: #d4cfc8;
+  --primary: #c0392b;
+  --primary-foreground: #f0ebe4;
+  --secondary: #1e1d1b;
+  --secondary-foreground: #a09a92;
+  --muted: #1a1918;
+  --muted-foreground: #6e6a63;
+  --accent: #e84040;
+  --accent-foreground: #f0ebe4;
+  --border: rgba(255,255,255,0.06);
+  --ring: #c0392b;
+  --radius: 4px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}

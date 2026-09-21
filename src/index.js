@@ -11,6 +11,16 @@ const registerSocketHandlers = require('./socket/handlers');
 const { ensureVendorAssets } = require('./vendorAssets');
 
 const app = express();
+// The real UI (web/) is a Vite/React app built to web/dist - `npm run build`
+// (root package.json) builds it. public/ still holds the self-hosted
+// MediaPipe assets (src/vendorAssets.js) and the old vanilla test client
+// (public/legacy-test/), so both stay mounted; express.static falls through
+// to the next one when a path isn't found in the first.
+app.use(
+  express.static(path.join(__dirname, '..', 'web', 'dist'), {
+    setHeaders: (res) => res.set('Cache-Control', 'no-store'),
+  })
+);
 app.use(
   express.static(path.join(__dirname, '..', 'public'), {
     setHeaders: (res) => res.set('Cache-Control', 'no-store'),
