@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameSocket } from './useGameSocket'
 import { useFocusDetector, type DetectorState } from './useFocusDetector'
+import { isMuted, playAlert, playArm, playClick, playExplosion, setMuted } from './sounds'
 import type { BombTick, LeaderboardEntry, Room, RoomListEntry, RoundSummary } from './types'
 
 type RoomWithExtras = Room & { bombTick: BombTick | null; roundSummary: RoundSummary | null }
@@ -90,7 +91,14 @@ function FocusStatus({ detector, onRetry, onToggleManual }: { detector: Detector
   return (
     <div className="flex flex-col items-center gap-2">
       <button
-        onClick={clickable ? onToggleManual : undefined}
+        onClick={
+          clickable
+            ? () => {
+                playClick()
+                onToggleManual()
+              }
+            : undefined
+        }
         disabled={!clickable}
         className="px-4 py-2 text-center transition-all"
         style={{
@@ -107,7 +115,10 @@ function FocusStatus({ detector, onRetry, onToggleManual }: { detector: Detector
       </button>
       {detector.phase === 'camera-error' && (
         <button
-          onClick={onRetry}
+          onClick={() => {
+            playClick()
+            onRetry()
+          }}
           className="px-3 py-1.5 text-xs uppercase tracking-widest"
           style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', border: `1px solid ${RED}66`, color: RED, background: 'transparent' }}
         >
@@ -134,7 +145,7 @@ function MembersPanel({ room, mySocketId }: { room: Room; mySocketId: string | n
           return (
             <div
               key={p.id}
-              className="flex items-start gap-3 px-4 py-3"
+              className={`flex items-start gap-3 px-4 py-3 ${!p.focused ? 'danger-pulse-border' : ''}`}
               style={{ borderBottom: '1px solid var(--border)', background: isYou ? RED_DIM : 'transparent' }}
             >
               <div className="relative flex-shrink-0">
@@ -201,6 +212,7 @@ function HomeScreen({
   const [busy, setBusy] = useState(false)
 
   async function handleCreate() {
+    playClick()
     if (!username.trim()) return setError('Enter a username first.')
     if (!newRoomName.trim()) return setError('Give your team a name.')
     setBusy(true)
@@ -210,6 +222,7 @@ function HomeScreen({
   }
 
   async function handleJoin(codeOverride?: string) {
+    playClick()
     if (!username.trim()) return setError('Enter a username first.')
     const code = (codeOverride ?? joinCode).trim().toUpperCase()
     if (code.length < 4) return setError('Enter a valid team code.')
@@ -263,6 +276,7 @@ function HomeScreen({
               <button
                 key={t}
                 onClick={() => {
+                  playClick()
                   setTab(t)
                   setError('')
                 }}
@@ -453,7 +467,10 @@ function RoundSummaryPanel({ summary, mySocketId, onLeave }: { summary: RoundSum
       </div>
 
       <button
-        onClick={onLeave}
+        onClick={() => {
+          playClick()
+          onLeave()
+        }}
         className="px-6 py-3 text-xs font-semibold uppercase tracking-widest transition-all hover:brightness-110 active:scale-95"
         style={{ background: RED, color: '#f0ebe4', fontFamily: 'var(--font-mono)', letterSpacing: '0.15em' }}
       >
@@ -544,7 +561,24 @@ function SessionView({
   const isExploded = room.state === 'exploded'
   const progress = isArmed && bombTick && bombTick.bombBufferMax > 0 ? 1 - bombTick.bombBuffer / bombTick.bombBufferMax : 0
 
+  const wasAnyUnfocused = useRef(false)
+  useEffect(() => {
+    const anyUnfocused = bombTick?.anyUnfocused ?? false
+    if (anyUnfocused && !wasAnyUnfocused.current) playAlert()
+    wasAnyUnfocused.current = anyUnfocused
+  }, [bombTick?.anyUnfocused])
+
+  const hasPlayedExplosion = useRef(false)
+  useEffect(() => {
+    if (isExploded && !hasPlayedExplosion.current) {
+      hasPlayedExplosion.current = true
+      playExplosion()
+    }
+    if (!isExploded) hasPlayedExplosion.current = false
+  }, [isExploded])
+
   async function handleStart() {
+    playArm()
     setStarting(true)
     setStartError('')
     const res = await onStart()
@@ -552,13 +586,21 @@ function SessionView({
     if (res.error) setStartError(res.error)
   }
 
+  const dangerFlash = isArmed && (bombTick?.anyUnfocused ?? false)
+
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)', fontFamily: 'var(--font-sans)' }}>
+    <div className="min-h-screen flex flex-col relative" style={{ background: 'var(--background)', fontFamily: 'var(--font-sans)' }}>
+      {dangerFlash && (
+        <div className="danger-flash" style={{ position: 'fixed', inset: 0, zIndex: 40, pointerEvents: 'none' }} />
+      )}
       {/* Header */}
       <header className="grid items-center px-6" style={{ gridTemplateColumns: '1fr auto 1fr', borderBottom: '1px solid var(--border)', minHeight: 52 }}>
         <div className="flex items-center gap-3">
           <button
-            onClick={onLeave}
+            onClick={() => {
+              playClick()
+              onLeave()
+            }}
             className="flex items-center gap-1.5 transition-opacity hover:opacity-60"
             style={{ ...monoXs, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}
           >
@@ -593,7 +635,10 @@ function SessionView({
             {(['game', 'leaderboard'] as const).map((v, i) => (
               <button
                 key={v}
-                onClick={() => setTab(v)}
+                onClick={() => {
+                  playClick()
+                  setTab(v)
+                }}
                 className="px-4 py-1.5 text-xs uppercase tracking-widest transition-all"
                 style={{ fontFamily: 'var(--font-mono)', background: tab === v ? RED_DIM : 'transparent', color: tab === v ? RED : 'var(--muted-foreground)', borderRight: i === 0 ? '1px solid var(--border)' : 'none' }}
               >
@@ -668,6 +713,40 @@ function SessionView({
   )
 }
 
+// ── Mute toggle ───────────────────────────────────────────────────────────────
+
+function MuteToggle() {
+  const [muted, setMutedState] = useState(isMuted())
+
+  return (
+    <button
+      onClick={() => {
+        const next = !muted
+        setMuted(next)
+        setMutedState(next)
+        if (!next) playClick()
+      }}
+      title={muted ? 'Unmute sound' : 'Mute sound'}
+      className="flex items-center justify-center transition-opacity hover:opacity-70"
+      style={{
+        position: 'fixed',
+        top: 12,
+        right: 12,
+        zIndex: 50,
+        width: 30,
+        height: 30,
+        border: '1px solid var(--border)',
+        background: 'var(--card)',
+        color: muted ? 'var(--muted-foreground)' : RED,
+        fontFamily: 'var(--font-mono)',
+        fontSize: '0.85rem',
+      }}
+    >
+      {muted ? '\u{1F507}' : '\u{1F50A}'}
+    </button>
+  )
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -687,12 +766,22 @@ export default function App() {
   }
 
   if (!room) {
-    return <HomeScreen roomsList={roomsList} onCreate={handleCreate} onJoin={handleJoin} />
+    return (
+      <>
+        <MuteToggle />
+        <HomeScreen roomsList={roomsList} onCreate={handleCreate} onJoin={handleJoin} />
+      </>
+    )
   }
 
   // bombTick/roundSummary are separate socket streams from room-state - merge
   // them onto the room object the views expect a single source of truth from.
   const roomWithExtras = { ...room, bombTick, roundSummary }
 
-  return <SessionView room={roomWithExtras} mySocketId={mySocketId} username={username} leaderboard={leaderboard} onStart={startGame} onLeave={leaveRoom} />
+  return (
+    <>
+      <MuteToggle />
+      <SessionView room={roomWithExtras} mySocketId={mySocketId} username={username} leaderboard={leaderboard} onStart={startGame} onLeave={leaveRoom} />
+    </>
+  )
 }
