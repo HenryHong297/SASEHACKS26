@@ -24,7 +24,10 @@ export function setMuted(next: boolean) {
   } catch {
     // ignore - private browsing / storage disabled
   }
-  if (next) stopDangerLoop()
+  // Don't stop the danger beep loop here - it's a timer chain independent of
+  // audio output, and tone() already no-ops while muted. Leaving it running
+  // means un-muting mid-alarm is heard immediately instead of staying silent
+  // until the danger state next toggles.
 }
 
 function getCtx(): AudioContext | null {
@@ -75,68 +78,39 @@ export function playArm() {
 
 // ── Danger loop (continuous alarm while the screen is flashing red) ──────────
 // A single long-lived oscillator wobbled by an LFO, instead of retriggering a
-// one-shot blip - gives a real siren/klaxon sense of urgency that runs for as
-// long as someone's unfocused, and stops the instant they're not.
-let dangerOsc: OscillatorNode | null = null
-let dangerLfo: OscillatorNode | null = null
-let dangerGain: GainNode | null = null
+// one-shot blip - a DEFCON-style beeping countdown that speeds up and rises
+// in pitch as `dangerLevel` climbs toward 1 (bomb buffer nearly empty), and
+// stops the instant nobody's unfocused anymore.
+let dangerLoopActive = false
+let dangerTimeoutId: ReturnType<typeof setTimeout> | null = null
+let dangerLevel = 0 // 0 = buffer full/safe, 1 = buffer empty/about to blow
+
+/** Called continuously with how close the bomb is to exploding (0-1) so the
+ * beep loop can escalate live, independent of when it started beeping. */
+export function setDangerLevel(level: number) {
+  dangerLevel = Math.min(1, Math.max(0, level))
+}
+
+function dangerBeep() {
+  if (!dangerLoopActive) return
+  const freq = 620 + dangerLevel * 560 // higher pitch the closer to exploding
+  tone(freq, 85, { type: 'square', gain: 0.13 })
+  const interval = 850 - dangerLevel * 700 // 850ms calm -> ~150ms about to blow
+  dangerTimeoutId = setTimeout(dangerBeep, interval)
+}
 
 export function startDangerLoop() {
-  if (muted || dangerOsc) return
-  const audioCtx = getCtx()
-  if (!audioCtx) return
-
-  const osc = audioCtx.createOscillator()
-  osc.type = 'square'
-  osc.frequency.setValueAtTime(480, audioCtx.currentTime)
-
-  const lfo = audioCtx.createOscillator()
-  lfo.type = 'sine'
-  lfo.frequency.setValueAtTime(1.3, audioCtx.currentTime) // wobble rate - roughly matches the CSS flash cadence
-
-  const lfoGain = audioCtx.createGain()
-  lfoGain.gain.setValueAtTime(200, audioCtx.currentTime) // wobble depth in Hz
-  lfo.connect(lfoGain)
-  lfoGain.connect(osc.frequency)
-
-  const gainNode = audioCtx.createGain()
-  gainNode.gain.setValueAtTime(0, audioCtx.currentTime)
-  gainNode.gain.linearRampToValueAtTime(0.07, audioCtx.currentTime + 0.05)
-
-  osc.connect(gainNode)
-  gainNode.connect(audioCtx.destination)
-  osc.start()
-  lfo.start()
-
-  dangerOsc = osc
-  dangerLfo = lfo
-  dangerGain = gainNode
+  if (dangerLoopActive) return
+  dangerLoopActive = true
+  dangerBeep()
 }
 
 export function stopDangerLoop() {
-  if (!dangerOsc || !dangerGain) return
-  const audioCtx = getCtx()
-  const osc = dangerOsc
-  const lfo = dangerLfo
-  const gainNode = dangerGain
-  dangerOsc = null
-  dangerLfo = null
-  dangerGain = null
-
-  if (audioCtx) {
-    const now = audioCtx.currentTime
-    gainNode.gain.cancelScheduledValues(now)
-    gainNode.gain.setValueAtTime(gainNode.gain.value, now)
-    gainNode.gain.linearRampToValueAtTime(0, now + 0.08)
+  dangerLoopActive = false
+  if (dangerTimeoutId) {
+    clearTimeout(dangerTimeoutId)
+    dangerTimeoutId = null
   }
-  setTimeout(() => {
-    try {
-      osc.stop()
-      lfo?.stop()
-    } catch {
-      // already stopped
-    }
-  }, 120)
 }
 
 /** Layered retro arcade-style "boom" for the bomb going off - a sharp crack, a

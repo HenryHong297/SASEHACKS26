@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameSocket } from './useGameSocket'
 import { useFocusDetector, type DetectorState } from './useFocusDetector'
-import { isMuted, playArm, playClick, playExplosion, setMuted, startDangerLoop, stopDangerLoop } from './sounds'
+import { isMuted, playArm, playClick, playExplosion, setDangerLevel, setMuted, startDangerLoop, stopDangerLoop } from './sounds'
 import type { BombTick, LeaderboardEntry, Room, RoomListEntry, RoundSummary } from './types'
 
 type RoomWithExtras = Room & { bombTick: BombTick | null; roundSummary: RoundSummary | null }
@@ -567,6 +567,13 @@ function SessionView({
     else stopDangerLoop()
     return () => stopDangerLoop()
   }, [dangerFlash])
+
+  // Keeps the beep loop's tempo/pitch in sync with the live buffer level,
+  // independent of when the loop itself started - so it keeps accelerating
+  // toward detonation even without the danger state toggling off and on.
+  useEffect(() => {
+    setDangerLevel(progress)
+  }, [progress])
 
   const hasPlayedExplosion = useRef(false)
   useEffect(() => {
