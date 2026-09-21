@@ -17,26 +17,29 @@ function formatClock(totalSeconds: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+// viewBox-based (not fixed pixel radius) so it can be dropped into a
+// container of any size via CSS - used both standalone and shrunk down to
+// sit inside the bomb asset's dial in SessionView.
 function Ring({ progress }: { progress: number }) {
-  const radius = 110
-  const stroke = 3
-  const r = radius - stroke / 2
+  const size = 100
+  const stroke = 4
+  const r = size / 2 - stroke / 2
   const circumference = 2 * Math.PI * r
   const offset = (1 - Math.min(1, Math.max(0, progress))) * circumference
   return (
-    <svg width={radius * 2} height={radius * 2} style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx={radius} cy={radius} r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={stroke} />
+    <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={stroke} />
       <circle
-        cx={radius}
-        cy={radius}
+        cx={size / 2}
+        cy={size / 2}
         r={r}
         fill="none"
         stroke={RED}
         strokeWidth={stroke}
         strokeDasharray={`${circumference} ${circumference}`}
         strokeDashoffset={offset}
-        strokeLinecap="butt"
-        style={{ transition: 'stroke-dashoffset 0.5s linear', filter: `drop-shadow(0 0 5px ${RED_GLOW})` }}
+        strokeLinecap="round"
+        style={{ transition: 'stroke-dashoffset 0.5s linear', filter: `drop-shadow(0 0 4px ${RED_GLOW})` }}
       />
     </svg>
   )
@@ -663,29 +666,41 @@ function SessionView({
             <RoundSummaryPanel summary={room.roundSummary} mySocketId={mySocketId} onLeave={onLeave} />
           ) : (
             <div className="flex flex-col items-center gap-8 w-full max-w-sm">
-              {/* Ring */}
-              <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Ring progress={progress} />
-                </div>
-                <div className="flex flex-col items-center z-10">
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '2.6rem',
-                      fontWeight: 700,
-                      color: isArmed ? RED : 'var(--foreground)',
-                      letterSpacing: '0.02em',
-                      lineHeight: 1,
-                      transition: 'color 0.3s',
-                      textShadow: isArmed ? `0 0 28px ${RED_GLOW}` : 'none',
-                    }}
-                  >
-                    {isArmed && bombTick ? formatClock(bombTick.sessionElapsed) : '00:00'}
-                  </span>
-                  <span className="mt-2 text-xs uppercase tracking-widest" style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted-foreground)' }}>
-                    {isLobby ? 'Standby' : isArmed ? 'Time Survived' : 'Defused'}
-                  </span>
+              {/* Bomb prop - timer/ring sit inside its black dial */}
+              <div style={{ position: 'relative', width: 300 }}>
+                <img src="/bomb.png" alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none', pointerEvents: 'none' }} />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '56.5%',
+                    top: '54.4%',
+                    width: '42%',
+                    aspectRatio: '1 / 1',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <div style={{ position: 'absolute', inset: 0 }}>
+                    <Ring progress={progress} />
+                  </div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '1.55rem',
+                        fontWeight: 700,
+                        color: isArmed ? RED : 'var(--foreground)',
+                        letterSpacing: '0.01em',
+                        lineHeight: 1,
+                        transition: 'color 0.3s',
+                        textShadow: isArmed ? `0 0 18px ${RED_GLOW}` : 'none',
+                      }}
+                    >
+                      {isArmed && bombTick ? formatClock(bombTick.sessionElapsed) : '00:00'}
+                    </span>
+                    <span className="mt-1 uppercase tracking-widest text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.5rem', color: 'var(--muted-foreground)' }}>
+                      {isLobby ? 'Standby' : isArmed ? 'Survived' : 'Defused'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
