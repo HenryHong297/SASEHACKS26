@@ -55,7 +55,9 @@ class BombEngine {
       // closer to exploding, the faster it goes, instead of a flat rate the
       // whole way down.
       const dangerFraction = 1 - room.bombBuffer / room.bombBufferMax; // 0 = full, 1 = empty
-      const escalation = 1 + dangerFraction * (BUFFER_DRAIN_ESCALATION_MAX - 1);
+      // squared instead of linear - stays close to normal speed early on,
+      // then snowballs hard in the last stretch instead of a gentle ramp
+      const escalation = 1 + dangerFraction ** 2 * (BUFFER_DRAIN_ESCALATION_MAX - 1);
       room.bombBuffer = Math.max(0, room.bombBuffer - BUFFER_DRAIN_PER_TICK * unfocusedCount * escalation);
     } else {
       room.bombBuffer = Math.min(room.bombBufferMax, room.bombBuffer + BUFFER_REGEN_PER_TICK);
