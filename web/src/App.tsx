@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGameSocket } from './useGameSocket'
 import { useFocusDetector, type DetectorState } from './useFocusDetector'
-import { isMuted, playArm, playClick, playExplosion, setDangerLevel, setMuted, startDangerLoop, stopDangerLoop } from './sounds'
+import { isMuted, playArm, playClick, playExplosion, playWrongKey, setDangerLevel, setMuted, startDangerLoop, stopDangerLoop } from './sounds'
 import type { BombTick, LeaderboardEntry, Room, RoomListEntry, RoundSummary } from './types'
 
 type RoomWithExtras = Room & { bombTick: BombTick | null; roundSummary: RoundSummary | null }
@@ -540,6 +540,89 @@ function LeaderboardView({ entries }: { entries: LeaderboardEntry[] }) {
   )
 }
 
+// ── Arming code (arrow keys / WASD sequence gate on starting the game) ───────
+
+type Direction = 'up' | 'down' | 'left' | 'right'
+const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right']
+const ARROW_SYMBOL: Record<Direction, string> = { up: '↑', down: '↓', left: '←', right: '→' }
+const KEY_TO_DIRECTION: Record<string, Direction> = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  w: 'up',
+  s: 'down',
+  a: 'left',
+  d: 'right',
+  W: 'up',
+  S: 'down',
+  A: 'left',
+  D: 'right',
+}
+
+function generateArmCode(length = 5): Direction[] {
+  return Array.from({ length }, () => DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)])
+}
+
+function ArmCodePanel({ disabled, onComplete }: { disabled: boolean; onComplete: () => void }) {
+  const [code] = useState<Direction[]>(() => generateArmCode())
+  const [matched, setMatched] = useState(0)
+
+  useEffect(() => {
+    if (disabled) return
+    function handleKeyDown(e: KeyboardEvent) {
+      const dir = KEY_TO_DIRECTION[e.key]
+      if (!dir) return
+      e.preventDefault()
+      setMatched((prev) => {
+        if (dir !== code[prev]) {
+          playWrongKey()
+          return 0
+        }
+        const next = prev + 1
+        if (next === code.length) {
+          onComplete()
+        } else {
+          playClick()
+        }
+        return next
+      })
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [code, disabled, onComplete])
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <p style={{ ...monoXs, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Enter Arming Code</p>
+      <div className="flex gap-2">
+        {code.map((dir, i) => {
+          const done = i < matched
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-center"
+              style={{
+                width: 36,
+                height: 36,
+                fontFamily: 'var(--font-mono)',
+                fontSize: '1.15rem',
+                border: `1px solid ${done ? '#2ecc71' : 'var(--border)'}`,
+                background: done ? 'rgba(46,204,113,0.15)' : 'var(--secondary)',
+                color: done ? '#2ecc71' : 'var(--foreground)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {ARROW_SYMBOL[dir]}
+            </div>
+          )
+        })}
+      </div>
+      <p style={{ ...monoXs, color: 'var(--muted-foreground)' }}>arrow keys or WASD</p>
+    </div>
+  )
+}
+
 // ── Session view ──────────────────────────────────────────────────────────────
 
 function SessionView({
@@ -713,14 +796,7 @@ function SessionView({
 
               {isLobby ? (
                 <div className="flex flex-col items-center gap-3">
-                  <button
-                    onClick={handleStart}
-                    disabled={starting}
-                    className="px-8 py-4 text-xs font-semibold uppercase tracking-widest transition-all hover:brightness-110 active:scale-95"
-                    style={{ background: RED, color: '#f0ebe4', fontFamily: 'var(--font-mono)', letterSpacing: '0.15em', boxShadow: `0 0 24px ${RED_GLOW}`, opacity: starting ? 0.6 : 1 }}
-                  >
-                    Arm The Bomb
-                  </button>
+                  <ArmCodePanel disabled={starting} onComplete={handleStart} />
                   {startError && <p style={{ ...monoXs, color: RED }}>⚠ {startError}</p>}
                 </div>
               ) : isArmed && bombTick ? (

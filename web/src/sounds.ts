@@ -76,6 +76,11 @@ export function playArm() {
   setTimeout(() => tone(760, 150, { type: 'sine', gain: 0.18 }), 110)
 }
 
+/** Low buzz for a wrong key while entering the arming code. */
+export function playWrongKey() {
+  tone(180, 130, { type: 'sawtooth', gain: 0.12 })
+}
+
 // ── Danger loop (continuous alarm while the screen is flashing red) ──────────
 // A single long-lived oscillator wobbled by an LFO, instead of retriggering a
 // one-shot blip - a DEFCON-style beeping countdown that speeds up and rises
