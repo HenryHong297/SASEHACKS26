@@ -666,15 +666,15 @@ function SessionView({
             <RoundSummaryPanel summary={room.roundSummary} mySocketId={mySocketId} onLeave={onLeave} />
           ) : (
             <div className="flex flex-col items-center gap-8 w-full max-w-sm">
-              {/* Bomb prop - the ring/timer overlays on top of it, not squeezed into its dial */}
-              <div style={{ position: 'relative', width: 420 }}>
+              {/* Bomb prop - timer/ring sit inside its black dial */}
+              <div style={{ position: 'relative', width: 300 }}>
                 <img src="/bomb.png" alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none', pointerEvents: 'none' }} />
                 <div
                   style={{
                     position: 'absolute',
                     left: '56.5%',
                     top: '54.4%',
-                    width: '80%',
+                    width: '42%',
                     aspectRatio: '1 / 1',
                     transform: 'translate(-50%, -50%)',
                   }}
@@ -686,18 +686,18 @@ function SessionView({
                     <span
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: '2.2rem',
+                        fontSize: '1.55rem',
                         fontWeight: 700,
                         color: isArmed ? RED : 'var(--foreground)',
                         letterSpacing: '0.01em',
                         lineHeight: 1,
                         transition: 'color 0.3s',
-                        textShadow: isArmed ? `0 0 22px ${RED_GLOW}` : 'none',
+                        textShadow: isArmed ? `0 0 18px ${RED_GLOW}` : 'none',
                       }}
                     >
                       {isArmed && bombTick ? formatClock(bombTick.sessionElapsed) : '00:00'}
                     </span>
-                    <span className="mt-1 uppercase tracking-widest text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>
+                    <span className="mt-1 uppercase tracking-widest text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.5rem', color: 'var(--muted-foreground)' }}>
                       {isLobby ? 'Standby' : isArmed ? 'Survived' : 'Defused'}
                     </span>
                   </div>
