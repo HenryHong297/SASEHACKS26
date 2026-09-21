@@ -671,7 +671,7 @@ function SessionView({
           ) : (
             <div className="flex flex-col items-center gap-8 w-full max-w-sm">
               {/* Bomb prop - timer/ring sit inside its black dial */}
-              <div style={{ position: 'relative', width: 300 }}>
+              <div style={{ position: 'relative', width: 440 }}>
                 <img src="/bomb.png" alt="" draggable={false} style={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none', pointerEvents: 'none' }} />
                 <div
                   style={{
@@ -683,6 +683,9 @@ function SessionView({
                     transform: 'translate(-50%, -50%)',
                   }}
                 >
+                  {/* dedicated black backdrop, slightly bigger than the ring's own
+                      fill, so the timer reads clearly against the art underneath */}
+                  <div style={{ position: 'absolute', inset: '-8%', borderRadius: '50%', background: '#000' }} />
                   <div style={{ position: 'absolute', inset: 0 }}>
                     <Ring progress={progress} />
                   </div>
@@ -690,7 +693,7 @@ function SessionView({
                     <span
                       style={{
                         fontFamily: 'var(--font-mono)',
-                        fontSize: '1.55rem',
+                        fontSize: '2rem',
                         fontWeight: 700,
                         color: isArmed ? RED : 'var(--foreground)',
                         letterSpacing: '0.01em',
@@ -701,7 +704,7 @@ function SessionView({
                     >
                       {isArmed && bombTick ? formatClock(bombTick.sessionElapsed) : '00:00'}
                     </span>
-                    <span className="mt-1 uppercase tracking-widest text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.5rem', color: 'var(--muted-foreground)' }}>
+                    <span className="mt-1 uppercase tracking-widest text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>
                       {isLobby ? 'Standby' : isArmed ? 'Survived' : 'Defused'}
                     </span>
                   </div>
