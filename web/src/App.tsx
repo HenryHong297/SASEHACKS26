@@ -676,9 +676,9 @@ function SessionView({
                 <div
                   style={{
                     position: 'absolute',
-                    left: '56.5%',
-                    top: '54.4%',
-                    width: '42%',
+                    left: '50.7%',
+                    top: '47.3%',
+                    width: '27%',
                     aspectRatio: '1 / 1',
                     transform: 'translate(-50%, -50%)',
                   }}
