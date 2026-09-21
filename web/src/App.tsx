@@ -28,6 +28,10 @@ function Ring({ progress }: { progress: number }) {
   const offset = (1 - Math.min(1, Math.max(0, progress))) * circumference
   return (
     <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+      {/* solid disc instead of a transparent center - reads as one complete
+          black circle (matching the bomb art's drawn dial) with the red
+          progress ring wrapping its outer rim, rather than a hollow track */}
+      <circle cx={size / 2} cy={size / 2} r={r - stroke / 2 + 0.5} fill="#000" />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={stroke} />
       <circle
         cx={size / 2}
