@@ -11,6 +11,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      // self-hosted at runtime by the Express server (src/vendorAssets.js),
+      // not part of this build - without this Rollup treats the dynamic
+      // import() in useFocusDetector.ts as an unresolvable error instead of
+      // leaving it for the browser to resolve against the live server.
+      external: ['/vendor/mediapipe/vision_bundle.mjs'],
+    },
   },
   server: {
     port: 5173,
