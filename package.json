@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "build": "node -e \"require('fs').rmSync('web/node_modules',{recursive:true,force:true})\" && npm --prefix web install && npm --prefix web run build",
+    "build": "node -e \"require('fs').rmSync('web/node_modules',{recursive:true,force:true})\" && npx --yes pnpm -C web install && npx --yes pnpm -C web run build",
     "simulate": "node test/simulate.js",
     "tunnel": "ngrok http --domain=geologic-tinfoil-evade.ngrok-free.dev 3000",
     "tunnel:localtunnel": "npx --yes localtunnel --port 3000 --subdomain controlledchargedemo"
