@@ -6,7 +6,7 @@ This repo has two parts: the Node + Socket.IO server (the game itself lives here
 
 ## what you need
 
-- Node **22.5+**. We're using the built-in `node:sqlite` module instead of a normal npm sqlite package — saves everyone from needing Visual Studio Build Tools installed just to get a database working (learned that one the hard way). Check with `node -v`.
+- Node **24+**. We're using the built-in `node:sqlite` module instead of a normal npm sqlite package — saves everyone from needing Visual Studio Build Tools installed just to get a database working (learned that one the hard way). It needs a newer Node than you might expect: `node:sqlite` throws `ERR_UNKNOWN_BUILTIN_MODULE` on Node 22.x (confirmed the hard way on a deploy host defaulting to 22.11.0), so both `.node-version` and `render.yaml` pin 24.21.0. Check with `node -v`.
 
 ## getting it running
 

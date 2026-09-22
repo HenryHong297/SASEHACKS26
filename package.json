@@ -13,7 +13,7 @@
     "tunnel:localtunnel": "npx --yes localtunnel --port 3000 --subdomain controlledchargedemo"
   },
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=24.0.0"
   },
   "dependencies": {
     "express": "^4.21.0",
