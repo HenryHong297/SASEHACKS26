@@ -2,6 +2,10 @@
 node_modules/
 web/node_modules/
 web/dist/
+# generated on whatever platform installed it - committing it caused Render's
+# Linux build to fail resolving rolldown's native binary from a Windows-built
+# lockfile (npm/cli#4828); letting each platform resolve its own is safer here
+web/package-lock.json
 leaderboard.db
 leaderboard.db-wal
 leaderboard.db-shm
