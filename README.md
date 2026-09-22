@@ -64,9 +64,10 @@ Notes:
 
 ### ML-Tracking.py (optional standalone alternative)
 
-`ML-Tracking.py` is a separate, earlier prototype of the same idea, built in Python with OpenCV — same calibration/grace-period/rolling-score approach, ported to MediaPipe's Tasks API. It's no longer required for the game (the browser does its own detection now), but it still works standalone if you want a Python-side experiment or a second opinion on your focus score:
+`ml-tracking/ML-Tracking.py` is a separate, earlier prototype of the same idea, built in Python with OpenCV — same calibration/grace-period/rolling-score approach, ported to MediaPipe's Tasks API. It's no longer required for the game (the browser does its own detection now), but it still works standalone if you want a Python-side experiment or a second opinion on your focus score. It lives in its own subdirectory (not the repo root) specifically so hosting platforms that auto-detect a project's language from root-level files see this as a Node app, not a Python one:
 
 ```powershell
+cd ml-tracking
 pip install -r requirements.txt
 python ML-Tracking.py
 ```
@@ -153,6 +154,7 @@ public/
   vendor/                 gitignored - downloaded MediaPipe assets land here, served like any other static file
 test/
   simulate.js             fake players for testing without a browser
-ML-Tracking.py            optional standalone Python focus tracker (not wired into the game anymore)
-requirements.txt          pip deps for ML-Tracking.py, if you use it
+ml-tracking/
+  ML-Tracking.py          optional standalone Python focus tracker (not wired into the game anymore) - kept out of the repo root so hosting platforms don't mistake this for a Python project
+  requirements.txt        pip deps for ML-Tracking.py, if you use it
 ```
